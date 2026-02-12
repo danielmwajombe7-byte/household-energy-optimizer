@@ -1,148 +1,125 @@
+# energy_dashboard.py
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from io import BytesIO
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
+import os
 
-st.set_page_config(
-    page_title="⚡ Energy Usage Dashboard",
-    layout="wide",
-    page_icon="⚡"
+# ===============================
+# Title
+# ===============================
+st.set_page_config(page_title="⚡ Energy Usage Control Dashboard", layout="wide")
+st.title("⚡ Energy Usage Control Dashboard")
+
+# ===============================
+# Show current working directory (optional debug)
+# ===============================
+st.write("Current working directory:", os.getcwd())
+
+# ===============================
+# Load dataset directly
+# ===============================
+DATA_PATH = r"C:\Users\user\Desktop\ML_PRROJECT\individual+household+electric+power+consumption.csv"
+
+try:
+    df = pd.read_csv(DATA_PATH, sep=';', na_values='?')
+    st.success("✅ Dataset loaded successfully!")
+except FileNotFoundError:
+    st.error(f"❌ Could not find file at {DATA_PATH}. Make sure the path is correct.")
+    st.stop()
+
+# ===============================
+# Preprocessing
+# ===============================
+# Combine Date + Time
+df['datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], dayfirst=True)
+
+# Convert numeric columns
+numeric_cols = ['Global_active_power','Global_reactive_power','Voltage',
+                'Sub_metering_1','Sub_metering_2','Sub_metering_3']
+df[numeric_cols] = df[numeric_cols].astype(float)
+
+# Feature engineering
+df['hour'] = df['datetime'].dt.hour
+df['day_of_week'] = df['datetime'].dt.dayofweek
+df['month'] = df['datetime'].dt.month
+
+# Rolling average past 3 hours
+df['rolling_avg_3h'] = df['Global_active_power'].rolling(window=3).mean().bfill()
+
+# Drop NaNs
+df_clean = df.dropna(subset=['Global_active_power','rolling_avg_3h','hour','day_of_week','month'])
+
+# Features and target
+X = df_clean[['hour','day_of_week','month','rolling_avg_3h']]
+y = df_clean['Global_active_power']
+
+# ===============================
+# Train Random Forest Model
+# ===============================
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
 )
-
-st.title("⚡ Household Energy Consumption & Prediction Dashboard")
-
-# ------------------------
-# Load dataset (built‑in)
-# ------------------------
-
-@st.cache_data
-def load_data():
-    df = pd.read_csv("individual+household+electric+power+consumption.csv",
-                     sep=";", na_values="?")
-    df['datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'],
-                                    dayfirst=True, errors='coerce')
-    numeric_cols = [
-        'Global_active_power','Global_reactive_power','Voltage',
-        'Sub_metering_1','Sub_metering_2','Sub_metering_3'
-    ]
-    df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
-    df['hour'] = df['datetime'].dt.hour
-    df['day_of_week'] = df['datetime'].dt.dayofweek
-    df['month'] = df['datetime'].dt.month
-    df['rolling_avg_3h'] = df['Global_active_power'].rolling(3).mean().bfill()
-    df_clean = df.dropna(subset=['Global_active_power','rolling_avg_3h'])
-    return df_clean
-
-df = load_data()
-
-# ------------------------
-# Overview metrics
-# ------------------------
-
-st.markdown("## 📊 Data Summary")
-col1, col2, col3 = st.columns(3)
-col1.metric("Total Records", f"{len(df):,}")
-col2.metric("Avg Active Power (kW)", f"{df['Global_active_power'].mean():.2f}")
-col3.metric("Peak Active Power (kW)", f"{df['Global_active_power'].max():.2f}")
-
-# ------------------------
-# Interactive Filters
-# ------------------------
-
-st.markdown("## 🔍 Filters & Visualizations")
-
-with st.expander("Select time range / filters"):
-    min_date, max_date = st.slider("Select datetime range",
-                                   value=(df['datetime'].min(), df['datetime'].max()),
-                                   format="YYYY-MM-DD HH:mm")
-    sel_days = st.multiselect("Days of Week (0=Mon)", sorted(df['day_of_week'].unique()),
-                              default=sorted(df['day_of_week'].unique()))
-    sel_hours = st.slider("Hour range", 0, 23, (0,23))
-
-df_filtered = df[
-    (df['datetime'] >= min_date) &
-    (df['datetime'] <= max_date) &
-    (df['day_of_week'].isin(sel_days)) &
-    (df['hour'] >= sel_hours[0]) &
-    (df['hour'] <= sel_hours[1])
-]
-
-st.write(f"Filtered dataset: {len(df_filtered):,} rows")
-
-# ------------------------
-# Plots
-# ------------------------
-
-st.markdown("### 📈 Energy Usage Over Time")
-fig, ax = plt.subplots(figsize=(12,4))
-ax.plot(df_filtered['datetime'], df_filtered['Global_active_power'], alpha=0.6)
-ax.set_xlabel("Datetime")
-ax.set_ylabel("Global Active Power (kW)")
-st.pyplot(fig)
-
-st.markdown("### 📊 Hourly Average Power")
-hourly = df_filtered.groupby('hour')['Global_active_power'].mean()
-st.bar_chart(hourly)
-
-# ------------------------
-# Train ML Model
-# ------------------------
-
-X = df[['hour','day_of_week','month','rolling_avg_3h']]
-y = df['Global_active_power']
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-model = RandomForestRegressor(n_estimators=80, random_state=42)
+model = RandomForestRegressor(n_estimators=100, random_state=42)
 model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+st.write(f"Model RMSE: {rmse:.4f} kW")
 
-st.markdown("## 🤖 Prediction Model Performance")
-st.write(f"**RMSE:** {rmse:.3f} kW")
+# ===============================
+# Threshold for High Energy Usage
+# ===============================
+threshold = y_train.mean() + y_train.std()
 
-# ------------------------
-# Interactive Prediction Panel
-# ------------------------
+# ===============================
+# Sidebar - User Input for Prediction
+# ===============================
+st.sidebar.header("Predict Energy Usage")
+hour_input = st.sidebar.slider("Hour (0-23)", 0, 23, 12)
+day_input = st.sidebar.slider("Day of Week (0=Mon, 6=Sun)", 0, 6, 2)
+month_input = st.sidebar.slider("Month (1-12)", 1, 12, 6)
+rolling_input = st.sidebar.number_input("Past 3h Rolling Avg (kW)", 
+                                        min_value=0.0, max_value=float(df['Global_active_power'].max()), 
+                                        value=float(df['Global_active_power'].mean()), step=0.1)
 
-st.markdown("## 🧠 Custom Input Prediction")
+input_data = pd.DataFrame({
+    'hour': [hour_input],
+    'day_of_week': [day_input],
+    'month': [month_input],
+    'rolling_avg_3h': [rolling_input]
+})
 
-colA, colB, colC, colD = st.columns(4)
-input_hour = colA.number_input("Hour (0–23)", min_value=0, max_value=23, value=12)
-input_day = colB.number_input("Day of Week (0=Mon…6=Sun)", min_value=0, max_value=6, value=2)
-input_month = colC.number_input("Month (1–12)", min_value=1, max_value=12, value=6)
-input_rolling = colD.slider("Rolling Avg 3h (approx)", 0.0, float(df['rolling_avg_3h'].max()), float(df['rolling_avg_3h'].mean()))
+predicted_usage = model.predict(input_data)[0]
 
-if st.button("🔮 Predict Energy Usage"):
-    user_input = np.array([[input_hour, input_day, input_month, input_rolling]])
-    prediction = model.predict(user_input)[0]
-    st.success(f"📌 Predicted Global Active Power: **{prediction:.3f} kW**")
+if predicted_usage > threshold:
+    recommendation = "⚡ High usage predicted! Turn off non-essential appliances."
+else:
+    recommendation = "✅ Energy usage normal."
 
-    threshold = y_train.mean() + y_train.std()
-    if prediction > threshold:
-        st.warning("⚡ High usage predicted! Consider reducing load.")
-    else:
-        st.info("✅ Normal usage predicted.")
+st.sidebar.markdown(f"**Predicted Energy Usage:** {predicted_usage:.2f} kW")
+st.sidebar.markdown(f"**Recommendation:** {recommendation}")
 
-# ------------------------
-# Download filtered data
-# ------------------------
+# ===============================
+# Main Dashboard Visualizations
+# ===============================
+st.subheader("📊 Energy Usage Sample Chart")
+fig, ax = plt.subplots(figsize=(12,6))
+ax.plot(df_clean['datetime'][:1000], df_clean['Global_active_power'][:1000], color='blue')
+ax.set_xlabel("Datetime")
+ax.set_ylabel("Global Active Power (kW)")
+ax.set_title("Energy Usage (Sample 1000 points)")
+st.pyplot(fig)
 
-def to_excel_download(df_df):
-    output = BytesIO()
-    writer = pd.ExcelWriter(output, engine='xlsxwriter')
-    df_df.to_excel(writer, index=False, sheet_name="FilteredData")
-    writer.save()
-    return output.getvalue()
+st.subheader("⚡ High Energy Usage Hours")
+high_usage_hours = X_test[y_pred > threshold].copy()
+high_usage_hours['Predicted_Power'] = y_pred[y_pred > threshold]
+st.dataframe(high_usage_hours.sort_values('Predicted_Power', ascending=False).head(10))
 
-st.markdown("## 📥 Download Data")
-download_data = to_excel_download(df_filtered)
-st.download_button(
-    label="Download Filtered Data (Excel)",
-    data=download_data,
-    file_name="filtered_energy_data.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+# ===============================
+# Dataset Preview
+# ===============================
+st.subheader("📄 Dataset Preview")
+st.dataframe(df_clean.head(10))
