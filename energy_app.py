@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import zipfile
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
@@ -18,17 +17,17 @@ st.markdown("Fast • Optimized • Streamlit Ready")
 
 @st.cache_data
 def load_and_prepare_data(uploaded_file):
-    with zipfile.ZipFile(uploaded_file) as z:
-        csv_name = z.namelist()[0]
-        with z.open(csv_name) as f:
-            df = pd.read_csv(f, sep=';', na_values='?')
+    # === Read Excel file directly ===
+    df = pd.read_excel(uploaded_file)
 
+    # === Create datetime column ===
     df['datetime'] = pd.to_datetime(
-        df['Date'] + ' ' + df['Time'],
+        df['Date'].astype(str) + ' ' + df['Time'].astype(str),
         dayfirst=True,
         errors='coerce'
     )
 
+    # === Convert numeric columns ===
     cols = [
         'Global_active_power','Global_reactive_power',
         'Voltage','Sub_metering_1',
@@ -36,8 +35,10 @@ def load_and_prepare_data(uploaded_file):
     ]
     df[cols] = df[cols].apply(pd.to_numeric, errors='coerce')
 
+    # === Sample data to reduce size ===
     df = df.sample(frac=0.05, random_state=42).sort_values('datetime')
 
+    # === Feature engineering ===
     df['hour'] = df['datetime'].dt.hour
     df['day'] = df['datetime'].dt.dayofweek
     df['month'] = df['datetime'].dt.month
@@ -46,18 +47,20 @@ def load_and_prepare_data(uploaded_file):
     return df.dropna()
 
 uploaded_file = st.file_uploader(
-    "📂 Upload household energy ZIP dataset",
-    type="zip"
+    "📂 Upload household energy Excel dataset",
+    type=["xlsx"]
 )
 
 if uploaded_file:
     df = load_and_prepare_data(uploaded_file)
 
+    # === Display metrics ===
     col1, col2, col3 = st.columns(3)
     col1.metric("Records Used", f"{len(df):,}")
     col2.metric("Avg Power (kW)", f"{df['Global_active_power'].mean():.2f}")
     col3.metric("Peak Power (kW)", f"{df['Global_active_power'].max():.2f}")
 
+    # === Prepare features & target ===
     X = df[['hour','day','month','rolling_avg']]
     y = df['Global_active_power']
 
@@ -77,12 +80,14 @@ if uploaded_file:
         rmse = np.sqrt(mean_squared_error(y_test, preds))
         st.success(f"Model trained successfully | RMSE: {rmse:.3f}")
 
+        # === Highlight high energy usage periods ===
         threshold = y_train.mean() + y_train.std()
         high_usage = X_test[preds > threshold]
 
         st.subheader("⚠️ Predicted High Energy Usage Periods")
         st.dataframe(high_usage.head(10))
 
+        # === Plot energy consumption trend ===
         st.subheader("📈 Energy Consumption Trend")
         fig = px.line(
             df.head(500),
