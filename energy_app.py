@@ -5,82 +5,89 @@ import zipfile
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import MinMaxScaler
 import plotly.express as px
 
-st.set_page_config(page_title="⚡ Household Energy Optimizer", layout="wide", page_icon="⚡")
+st.set_page_config(
+    page_title="Household Energy Optimizer",
+    page_icon="⚡",
+    layout="wide"
+)
 
-st.markdown("<h1 style='text-align: center; color: #ff6600;'>⚡ Household Energy Optimizer Dashboard</h1>", unsafe_allow_html=True)
-st.markdown("---")
+st.title("⚡ Household Energy Consumption Optimizer")
+st.markdown("Fast • Optimized • Streamlit Ready")
 
-# Sidebar
-st.sidebar.header("Upload & Settings")
-uploaded_file = st.sidebar.file_uploader("Upload your ZIP dataset", type="zip")
-sample_frac = st.sidebar.slider("Sample Fraction (%)", 5, 100, 20)
-
-if uploaded_file is not None:
+@st.cache_data
+def load_and_prepare_data(uploaded_file):
     with zipfile.ZipFile(uploaded_file) as z:
-        file_name = z.namelist()[0]
-        with z.open(file_name) as f:
+        csv_name = z.namelist()[0]
+        with z.open(csv_name) as f:
             df = pd.read_csv(f, sep=';', na_values='?')
 
-    df['datetime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], dayfirst=True, errors='coerce')
-    numeric_cols = ['Global_active_power','Global_reactive_power','Voltage',
-                    'Sub_metering_1','Sub_metering_2','Sub_metering_3']
-    df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
+    df['datetime'] = pd.to_datetime(
+        df['Date'] + ' ' + df['Time'],
+        dayfirst=True,
+        errors='coerce'
+    )
 
-    df = df.sample(frac=sample_frac/100, random_state=42).sort_values('datetime')
+    cols = [
+        'Global_active_power','Global_reactive_power',
+        'Voltage','Sub_metering_1',
+        'Sub_metering_2','Sub_metering_3'
+    ]
+    df[cols] = df[cols].apply(pd.to_numeric, errors='coerce')
+
+    df = df.sample(frac=0.05, random_state=42).sort_values('datetime')
 
     df['hour'] = df['datetime'].dt.hour
-    df['day_of_week'] = df['datetime'].dt.dayofweek
+    df['day'] = df['datetime'].dt.dayofweek
     df['month'] = df['datetime'].dt.month
-    df['rolling_avg_3h'] = df['Global_active_power'].rolling(window=3).mean().bfill()
-    df_clean = df.dropna(subset=['Global_active_power','rolling_avg_3h','hour','day_of_week','month'])
+    df['rolling_avg'] = df['Global_active_power'].rolling(3).mean().bfill()
 
-    scaler = MinMaxScaler()
-    df_clean[numeric_cols] = scaler.fit_transform(df_clean[numeric_cols])
+    return df.dropna()
 
-    X = df_clean[['hour','day_of_week','month','rolling_avg_3h']]
-    y = df_clean['Global_active_power']
+uploaded_file = st.file_uploader(
+    "📂 Upload household energy ZIP dataset",
+    type="zip"
+)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    model = RandomForestRegressor(n_estimators=100, random_state=42)
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
+if uploaded_file:
+    df = load_and_prepare_data(uploaded_file)
 
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-    threshold = y_train.mean() + y_train.std()
-    high_usage_hours = X_test.loc[y_pred > threshold]
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Records Used", f"{len(df):,}")
+    col2.metric("Avg Power (kW)", f"{df['Global_active_power'].mean():.2f}")
+    col3.metric("Peak Power (kW)", f"{df['Global_active_power'].max():.2f}")
 
-    # Metrics cards
-    col1, col2 = st.columns(2)
-    col1.metric("RMSE", f"{rmse:.4f}")
-    col2.metric("High Usage Threshold", f"{threshold:.4f}")
+    X = df[['hour','day','month','rolling_avg']]
+    y = df['Global_active_power']
 
-    # High usage table
-    st.markdown("### ⚡ High Energy Usage Predicted")
-    st.dataframe(high_usage_hours.head(10), use_container_width=True)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
 
-    # Interactive Plotly line chart
-    st.markdown("### 📈 Energy Usage Sample Plot")
-    fig = px.line(df_clean.head(1000), x='datetime', y='Global_active_power', 
-                  labels={"datetime":"Datetime", "Global_active_power":"Global Active Power (scaled)"},
-                  title="Energy Usage Sample")
-    st.plotly_chart(fig, use_container_width=True)
+    if st.button("🚀 Train Energy Model"):
+        model = RandomForestRegressor(
+            n_estimators=30,
+            max_depth=10,
+            random_state=42
+        )
+        model.fit(X_train, y_train)
+        preds = model.predict(X_test)
 
-    # Prediction section
-    st.markdown("### 🔮 Predict Energy Usage for Custom Time")
-    with st.expander("Enter input values"):
-        input_hour = st.number_input("Hour (0-23)", min_value=0, max_value=23, value=12)
-        input_day = st.number_input("Day of Week (0=Monday, 6=Sunday)", min_value=0, max_value=6, value=2)
-        input_month = st.number_input("Month (1-12)", min_value=1, max_value=12, value=6)
-        input_rolling = st.number_input("Rolling Avg 3h (scaled 0-1)", min_value=0.0, max_value=1.0, value=0.5, step=0.01)
+        rmse = np.sqrt(mean_squared_error(y_test, preds))
+        st.success(f"Model trained successfully | RMSE: {rmse:.3f}")
 
-        if st.button("Predict"):
-            custom_input = np.array([[input_hour, input_day, input_month, input_rolling]])
-            prediction = model.predict(custom_input)[0]
-            st.write(f"⚡ Predicted Global Active Power (scaled): {prediction:.4f}")
-            if prediction > threshold:
-                st.warning("High energy usage predicted! ⚡ Consider reducing load.")
-            else:
-                st.success("Energy usage normal ✅")
+        threshold = y_train.mean() + y_train.std()
+        high_usage = X_test[preds > threshold]
+
+        st.subheader("⚠️ Predicted High Energy Usage Periods")
+        st.dataframe(high_usage.head(10))
+
+        st.subheader("📈 Energy Consumption Trend")
+        fig = px.line(
+            df.head(500),
+            x="datetime",
+            y="Global_active_power",
+            title="Energy Usage Sample"
+        )
+        st.plotly_chart(fig, use_container_width=True)
