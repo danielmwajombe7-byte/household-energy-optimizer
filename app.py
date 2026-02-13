@@ -6,12 +6,13 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 import os
+import pickle
 
 # =====================================================
 # PAGE CONFIG
 # =====================================================
 st.set_page_config(
-    page_title="⚡ Smart Energy Prediction Dashboard",
+    page_title="⚡ Smart Energy Dashboard",
     page_icon="⚡",
     layout="wide"
 )
@@ -25,26 +26,20 @@ st.markdown("""
 Predict • Visualize • Understand Your Power Usage
 </p>
 """, unsafe_allow_html=True)
-
 st.divider()
 
 # =====================================================
-# LOAD DATA (DIRECT)
+# LOAD DATA
 # =====================================================
 DATA_PATH = "tanzania_power_data.csv"
 
 if not os.path.exists(DATA_PATH):
-    st.error("❌ Dataset haipo. Hakikisha 'tanzania_power_data.csv' ipo folder moja na app.py")
+    st.error("❌ Dataset haipo. Hakikisha 'tanzania_power_data.csv' iko folder moja na app.py")
     st.stop()
 
 @st.cache_data
 def load_data():
-    return pd.read_csv(
-        DATA_PATH,
-        sep=None,
-        engine="python",
-        on_bad_lines="skip"
-    )
+    return pd.read_csv(DATA_PATH, sep=None, engine="python", on_bad_lines="skip")
 
 df = load_data()
 
@@ -52,7 +47,6 @@ df = load_data()
 # CLEAN DATA
 # =====================================================
 df_numeric = df.select_dtypes(include="number")
-
 target_column = df_numeric.columns[-1]
 feature_columns = df_numeric.columns[:-1]
 
@@ -60,19 +54,33 @@ X = df_numeric[feature_columns]
 y = df_numeric[target_column]
 
 # =====================================================
-# TRAIN MODEL
+# TRAIN OR LOAD MODEL
+# =====================================================
+MODEL_PATH = "model.pkl"
+
+if os.path.exists(MODEL_PATH):
+    # Load saved model
+    with open(MODEL_PATH, "rb") as f:
+        model = pickle.load(f)
+else:
+    # Train model
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+    model = RandomForestRegressor(n_estimators=80, max_depth=10, random_state=42)
+    model.fit(X_train, y_train)
+
+    # Save model to file
+    with open(MODEL_PATH, "wb") as f:
+        pickle.dump(model, f)
+    st.success("✅ Model trained and saved as 'model.pkl'")
+
+# =====================================================
+# CALCULATE RMSE
 # =====================================================
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
-
-model = RandomForestRegressor(
-    n_estimators=80,
-    max_depth=10,
-    random_state=42
-)
-model.fit(X_train, y_train)
-
 preds = model.predict(X_test)
 rmse = np.sqrt(mean_squared_error(y_test, preds))
 
@@ -92,12 +100,9 @@ st.divider()
 # =====================================================
 left, right = st.columns([1, 1.4])
 
-# =====================================================
 # LEFT SIDE – USER INPUT
-# =====================================================
 with left:
     st.subheader("🧮 Enter Values for Prediction")
-
     user_input = {}
     for col in feature_columns:
         user_input[col] = st.slider(
@@ -106,15 +111,11 @@ with left:
             float(df_numeric[col].max()),
             float(df_numeric[col].mean())
         )
-
     predict_btn = st.button("🚀 Predict Energy Consumption", use_container_width=True)
 
-# =====================================================
-# RIGHT SIDE – RESULTS + ZOOM EFFECT
-# =====================================================
+# RIGHT SIDE – RESULTS + ZOOM
 with right:
     st.subheader("📈 Prediction Results")
-
     if predict_btn:
         input_df = pd.DataFrame([user_input])
         prediction = model.predict(input_df)[0]
@@ -125,50 +126,27 @@ with right:
         """, unsafe_allow_html=True)
 
         if prediction > y.mean():
-            st.warning("⚠️ High energy usage detected. Consider reducing heavy appliances.")
+            st.warning("⚠️ High energy usage detected.")
         else:
-            st.success("✅ Energy usage is within normal range.")
+            st.success("✅ Energy usage is normal.")
 
-        # ===============================
-        # ZOOM IN → OUT VISUALIZATION
-        # ===============================
+        # Zoom chart
         zoom_df = pd.DataFrame({
             "Stage": ["Low", "Average", "Your Prediction", "High"],
-            "Consumption": [
-                y.min(),
-                y.mean(),
-                prediction,
-                y.max()
-            ]
+            "Consumption": [y.min(), y.mean(), prediction, y.max()]
         })
-
         fig = px.line(
-            zoom_df,
-            x="Stage",
-            y="Consumption",
-            markers=True,
-            title="🔍 Zoom View of Your Energy Consumption",
+            zoom_df, x="Stage", y="Consumption",
+            markers=True, title="🔍 Zoom View of Energy",
             line_shape="spline"
         )
-
-        fig.update_traces(
-            marker=dict(size=14),
-            line=dict(width=4)
-        )
-
-        fig.update_layout(
-            transition_duration=1200,
-            template="plotly_white"
-        )
-
+        fig.update_traces(marker=dict(size=14), line=dict(width=4))
+        fig.update_layout(transition_duration=1200, template="plotly_white")
         st.plotly_chart(fig, use_container_width=True)
-
     else:
         st.info("👈 Enter values and click **Predict** to see results")
 
-# =====================================================
 # DATA PREVIEW
-# =====================================================
 st.divider()
-with st.expander("🔎 View Dataset Preview"):
+with st.expander("🔎 Dataset Preview"):
     st.dataframe(df.head(100))
