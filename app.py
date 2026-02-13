@@ -177,3 +177,9 @@ with right:
 st.divider()
 with st.expander("🔎 View Dataset Preview"):
     st.dataframe(df.head(100))
+df["Datetime"] = pd.to_datetime(
+    df["Date"] + " " + df["Time"],
+    dayfirst=True,
+    errors="coerce"
+)
+
