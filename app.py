@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # =====================================================
-# NAVIGATION
+# NAVIGATION FUNCTION
 # =====================================================
 def go_to(page):
     st.session_state.page = page
@@ -81,8 +81,8 @@ st.markdown("""
     text-align:center;
     margin-bottom:30px;
 ">
-<h1 style="color:white;">⚡ Smart Energy Consumption Dashboard</h1>
-<p style="color:#d1d5db;">Predict • Monitor • Optimize Electricity Usage</p>
+<h1 style="color:white; font-family:Segoe UI;">⚡ Smart Energy Consumption Dashboard</h1>
+<p style="color:#d1d5db; font-size:16px;">Predict • Monitor • Optimize Electricity Usage</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -91,7 +91,7 @@ st.markdown("""
 # =====================================================
 if st.session_state.page == "welcome":
 
-    st.markdown("### 👋 Welcome")
+    st.subheader("👋 Welcome")
     st.info("This system helps you understand and reduce electricity consumption.")
 
     user = st.text_input("👤 Enter your name")
@@ -126,6 +126,7 @@ elif st.session_state.page == "prediction":
     </h3>
     """, unsafe_allow_html=True)
 
+    # ================= INPUT GRID =================
     col1, col2 = st.columns(2)
     user_input = {}
 
@@ -147,100 +148,3 @@ elif st.session_state.page == "prediction":
         user_input["Global_intensity"] = st.number_input(
             "🔁 Current Intensity (A)", value=float(df_num["Global_intensity"].mean())
         )
-        user_input["Sub_metering_2"] = st.number_input(
-            "🧺 Laundry Power Usage", value=float(df_num["Sub_metering_2"].mean())
-        )
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    colA, colB = st.columns(2)
-
-    with colA:
-        if st.button("⚡ Predict Energy Consumption", use_container_width=True):
-            full = {}
-            for f in features:
-                full[f] = user_input.get(f, float(df_num[f].mean()))
-
-            input_df = pd.DataFrame([full])
-            st.session_state.prediction = model.predict(input_df)[0]
-            go_to("result")
-
-    with colB:
-        if st.button("🏠 Go Home", use_container_width=True):
-            go_to("welcome")
-
-# =====================================================
-# RESULT PAGE
-# =====================================================
-elif st.session_state.page == "result":
-
-    pred = st.session_state.prediction
-    avg = y.mean()
-
-    st.markdown(f"""
-    <div style="text-align:center;
-        background:#ecfeff;
-        padding:25px;
-        border-radius:15px;">
-    <h2>⚡ Predicted Energy Consumption</h2>
-    <h1 style="color:#0f766e;">{pred:.2f} kW</h1>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("### 📌 Smart Advice")
-
-    if pred > avg * 1.3:
-        st.error("""
-        ⚠️ **Very High Consumption in Short Time**
-        
-        **What this means:**
-        - Many high-power appliances used at once  
-        - Possible energy wastage  
-
-        **What to do:**
-        - Do not use cooker + iron + washing machine at the same time  
-        - Shift laundry to night hours  
-        - Switch off unused appliances  
-        """)
-    elif pred > avg:
-        st.warning("""
-        ⚠️ **Moderate High Consumption**
-
-        **Advice:**
-        - Reduce kitchen appliance usage  
-        - Use energy-saving bulbs  
-        """)
-    else:
-        st.success("""
-        ✅ **Energy usage is efficient**
-        
-        - Continue good energy habits  
-        - You are saving electricity 💚  
-        """)
-
-    show_graph = st.checkbox("📊 Show Comparison Graph")
-
-    if show_graph:
-        df_plot = pd.DataFrame({
-            "Level": ["Low", "Average", "Your Usage", "High"],
-            "Power (kW)": [y.min(), avg, pred, y.max()]
-        })
-
-        fig = px.bar(
-            df_plot,
-            x="Level",
-            y="Power (kW)",
-            color="Level",
-            template="plotly_white"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    colX, colY = st.columns(2)
-
-    with colX:
-        if st.button("🔁 New Prediction", use_container_width=True):
-            go_to("prediction")
-
-    with colY:
-        if st.button("🏠 Back to Dashboard", use_container_width=True):
-            go_to("welcome")
