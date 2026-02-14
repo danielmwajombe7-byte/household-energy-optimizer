@@ -71,7 +71,7 @@ model = RandomForestRegressor(
 model.fit(X_train, y_train)
 
 # =====================================================
-# HEADER
+# HEADER WITH ADVANCED SYMBOL
 # =====================================================
 st.markdown("""
 <div style="
@@ -80,8 +80,10 @@ st.markdown("""
     border-radius:15px;
     text-align:center;
     margin-bottom:30px;
+    font-family: 'Segoe UI', sans-serif;
 ">
-<h1 style="color:white; font-family:Segoe UI;">⚡ Smart Energy Consumption Dashboard</h1>
+<div style="font-size:60px; color:#facc15;">&#9889;</div>
+<h1 style="color:white; margin:0;">Smart Energy Consumption Dashboard</h1>
 <p style="color:#d1d5db; font-size:16px;">Predict • Monitor • Optimize Electricity Usage</p>
 </div>
 """, unsafe_allow_html=True)
@@ -91,8 +93,8 @@ st.markdown("""
 # =====================================================
 if st.session_state.page == "welcome":
 
-    st.subheader("👋 Welcome")
-    st.info("This system helps you understand and reduce electricity consumption.")
+    st.markdown("### 👋 Welcome")
+    st.info("This system helps you understand and reduce electricity consumption.", icon="💡")
 
     user = st.text_input("👤 Enter your name")
     building = st.selectbox(
@@ -114,7 +116,7 @@ if st.session_state.page == "welcome":
 elif st.session_state.page == "prediction":
 
     st.markdown(f"""
-    <div style="background:#f1f5f9;padding:15px;border-radius:10px;">
+    <div style="background:#e0f2fe;padding:15px;border-radius:10px;margin-bottom:15px;">
     👤 <b>{st.session_state.user}</b> |
     🏠 <b>{st.session_state.building}</b>
     </div>
@@ -148,3 +150,110 @@ elif st.session_state.page == "prediction":
         user_input["Global_intensity"] = st.number_input(
             "🔁 Current Intensity (A)", value=float(df_num["Global_intensity"].mean())
         )
+        user_input["Sub_metering_2"] = st.number_input(
+            "🧺 Laundry Power Usage", value=float(df_num["Sub_metering_2"].mean())
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    colA, colB = st.columns(2)
+
+    with colA:
+        if st.button("⚡ Predict Energy Consumption", use_container_width=True):
+            full = {}
+            for f in features:
+                full[f] = user_input.get(f, float(df_num[f].mean()))
+            input_df = pd.DataFrame([full])
+            st.session_state.prediction = model.predict(input_df)[0]
+            go_to("result")
+
+    with colB:
+        if st.button("🏠 Go Home", use_container_width=True):
+            go_to("welcome")
+
+# =====================================================
+# RESULT PAGE
+# =====================================================
+elif st.session_state.page == "result":
+
+    pred = st.session_state.prediction
+    avg = y.mean()
+
+    # ================= RESULT HEADER =================
+    st.markdown(f"""
+    <div style="text-align:center;
+        background: linear-gradient(90deg,#0f1727,#203a43,#2c5364);
+        padding:25px;
+        border-radius:15px;margin-bottom:15px;">
+    <div style="font-size:50px; color:#facc15;">&#9889;</div>
+    <h2 style="color:#fcd34d;">Predicted Energy Consumption</h2>
+    <h1 style="color:#22c55e;">{pred:.2f} kW</h1>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("### 📌 Smart Advice")
+    if pred > avg * 1.3:
+        st.error("""
+        ⚠️ **Very High Consumption in Short Time**
+        
+        **Implication:**
+        - Multiple high-power appliances used simultaneously  
+        - Possible energy wastage  
+
+        **Advice:**
+        - Avoid using cooker + iron + washing machine at the same time  
+        - Shift laundry to night/off-peak hours  
+        - Switch off unused appliances  
+        """)
+    elif pred > avg:
+        st.warning("""
+        ⚠️ **Moderately High Consumption**
+
+        **Advice:**
+        - Reduce heavy kitchen appliance usage  
+        - Use energy-saving bulbs and appliances  
+        """)
+    else:
+        st.success("""
+        ✅ **Energy usage is efficient**
+        
+        - Continue good energy habits  
+        - You are saving electricity 💚  
+        """)
+
+    st.divider()
+
+    # ================= GRAPH OPTIONS =================
+    st.markdown("### 📊 Energy Usage Visualization")
+    show_graph = st.checkbox("Show Energy Graph")
+
+    if show_graph:
+        graph_type = st.radio(
+            "Select Graph Type",
+            ["Bar Chart", "Line Chart", "Scatter Chart"],
+            horizontal=True
+        )
+
+        df_plot = pd.DataFrame({
+            "Level": ["Low", "Average", "Your Usage", "High"],
+            "Power (kW)": [y.min(), avg, pred, y.max()]
+        })
+
+        if graph_type == "Bar Chart":
+            fig = px.bar(df_plot, x="Level", y="Power (kW)", color="Level", template="plotly_white")
+        elif graph_type == "Line Chart":
+            fig = px.line(df_plot, x="Level", y="Power (kW)", markers=True, template="plotly_white")
+        else:
+            fig = px.scatter(df_plot, x="Level", y="Power (kW)", size="Power (kW)", color="Level", template="plotly_white")
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # ================= NAVIGATION BUTTONS =================
+    colX, colY = st.columns(2)
+    with colX:
+        if st.button("🔁 New Prediction", use_container_width=True):
+            go_to("prediction")
+    with colY:
+        if st.button("🏠 Back to Dashboard", use_containe_
