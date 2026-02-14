@@ -108,6 +108,7 @@ friendly_names = {
 left, right = st.columns([1, 1.4])
 
 # ================= LEFT: BUILDING TYPE & INPUTS =================
+# ================= LEFT: BUILDING TYPE & INPUTS =================
 with left:
     st.subheader("🏠 Select Building Type")
     building_type = st.selectbox(
@@ -129,9 +130,15 @@ with left:
         "Factory": ["Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity", "Sub_metering_3"]
     }
 
-    selected_features = feature_mapping[building_type]
+    # Chuja tu features ambazo dataset ina
+    selected_features = [f for f in feature_mapping[building_type] if f in df_numeric.columns]
 
-    # Create inputs dynamically
+    # Ikiwa kuna features ambazo hazipo, toa warning
+    missing_features = set(feature_mapping[building_type]) - set(selected_features)
+    if missing_features:
+        st.warning(f"⚠️ The following features are missing in your dataset and will be skipped: {', '.join(missing_features)}")
+
+    # Create inputs dynamically kwa features zilizopo tu
     for col in selected_features:
         label = friendly_names.get(col, col)
         user_input[col] = st.number_input(
@@ -156,6 +163,7 @@ with left:
         c2.metric("📊 Features", len(feature_columns))
         c3.metric("🎯 Target", friendly_names.get(target_column, target_column))
         c4.metric("📉 RMSE", f"{rmse:.3f}")
+
 
 # ================= RIGHT: RESULTS =================
 with right:
@@ -202,3 +210,4 @@ with right:
 st.divider()
 with st.expander("🔎 View Dataset Preview"):
     st.dataframe(df.head(50))
+
