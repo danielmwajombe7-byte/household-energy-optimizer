@@ -59,7 +59,6 @@ def load_and_clean_data():
     return df
 
 df = load_and_clean_data()
-
 df_numeric = df.select_dtypes(include="number")
 
 if df_numeric.shape[1] < 2:
@@ -69,9 +68,8 @@ if df_numeric.shape[1] < 2:
 # =====================================================
 # FEATURES & TARGET
 # =====================================================
-target_column = "Global_active_power"  # au jina lolote unalotaka
+target_column = "Global_active_power"
 feature_columns = df_numeric.columns.drop(target_column)
-
 
 X = df_numeric[feature_columns]
 y = df_numeric[target_column]
@@ -89,19 +87,7 @@ model = RandomForestRegressor(
     random_state=42
 )
 model.fit(X_train, y_train)
-
 rmse = np.sqrt(mean_squared_error(y_test, model.predict(X_test)))
-
-# =====================================================
-# METRICS
-# =====================================================
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("📄 Records", len(df))
-c2.metric("📊 Features", len(feature_columns))
-c3.metric("🎯 Target", target_column)
-c4.metric("📉 RMSE", f"{rmse:.3f}")
-
-st.divider()
 
 # =====================================================
 # FRIENDLY COLUMN NAMES
@@ -121,15 +107,33 @@ friendly_names = {
 # =====================================================
 left, right = st.columns([1, 1.4])
 
-# ================= LEFT: USER INPUT =================
+# ================= LEFT: BUILDING TYPE & INPUTS =================
 with left:
+    st.subheader("🏠 Select Building Type")
+    building_type = st.selectbox(
+        "Choose your building type:",
+        options=["House", "Office", "School", "Factory"]
+    )
+    st.markdown(f"**You selected:** {building_type}")
+    st.divider()
+    
     st.subheader("🧮 Enter Values for Prediction")
-
     user_input = {}
 
-    for col in feature_columns:
-        label = friendly_names.get(col, col)
+    # Feature mapping per building type
+    feature_mapping = {
+        "House": ["Global_active_power", "Global_reactive_power",
+                  "Voltage", "Global_intensity", "Sub_metering_1", "Sub_metering_2"],
+        "Office": ["Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity"],
+        "School": ["Global_active_power", "Voltage", "Sub_metering_1", "Sub_metering_3"],
+        "Factory": ["Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity", "Sub_metering_3"]
+    }
 
+    selected_features = feature_mapping[building_type]
+
+    # Create inputs dynamically
+    for col in selected_features:
+        label = friendly_names.get(col, col)
         user_input[col] = st.number_input(
             label,
             value=float(df_numeric[col].mean()),
@@ -141,6 +145,17 @@ with left:
         use_container_width=True,
         key="predict_btn"
     )
+
+    # Option to show/hide metrics
+    show_metrics = st.checkbox("Show Dataset & Model Metrics")
+
+    if show_metrics:
+        st.divider()
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("📄 Records", len(df))
+        c2.metric("📊 Features", len(feature_columns))
+        c3.metric("🎯 Target", friendly_names.get(target_column, target_column))
+        c4.metric("📉 RMSE", f"{rmse:.3f}")
 
 # ================= RIGHT: RESULTS =================
 with right:
@@ -187,4 +202,3 @@ with right:
 st.divider()
 with st.expander("🔎 View Dataset Preview"):
     st.dataframe(df.head(50))
-
