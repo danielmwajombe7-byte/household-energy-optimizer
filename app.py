@@ -69,8 +69,9 @@ if df_numeric.shape[1] < 2:
 # =====================================================
 # FEATURES & TARGET
 # =====================================================
-target_column = df_numeric.columns[-1]
+target_column = "Global_active_power"  # au jina lolote unalotaka
 feature_columns = df_numeric.columns.drop(target_column)
+
 
 X = df_numeric[feature_columns]
 y = df_numeric[target_column]
@@ -186,3 +187,4 @@ with right:
 st.divider()
 with st.expander("🔎 View Dataset Preview"):
     st.dataframe(df.head(50))
+
