@@ -119,25 +119,26 @@ with left:
     
     st.subheader("🧮 Enter Values for Prediction")
     user_input = {}
+    
+# Feature mapping per building type (only keep existing columns)
+feature_mapping = {
+    "House": [f for f in ["Global_active_power", "Global_reactive_power",
+                  "Voltage", "Global_intensity", "Sub_metering_1", "Sub_metering_2"] if f in df_numeric.columns],
+    "Office": [f for f in ["Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity"] if f in df_numeric.columns],
+    "School": [f for f in ["Global_active_power", "Voltage", "Sub_metering_1", "Sub_metering_3"] if f in df_numeric.columns],
+    "Factory": [f for f in ["Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity", "Sub_metering_3"] if f in df_numeric.columns]
+}
 
-    # Feature mapping per building type
-    feature_mapping = {
-        "House": ["Global_active_power", "Global_reactive_power",
-                  "Voltage", "Global_intensity", "Sub_metering_1", "Sub_metering_2"],
-        "Office": ["Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity"],
-        "School": ["Global_active_power", "Voltage", "Sub_metering_1", "Sub_metering_3"],
-        "Factory": ["Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity", "Sub_metering_3"]
-    }
 
-    # Chuja tu features ambazo dataset ina
+    # filter features dataset
     selected_features = [f for f in feature_mapping[building_type] if f in df_numeric.columns]
 
-    # Ikiwa kuna features ambazo hazipo, toa warning
+    # if there are features which are not available, show warning
     missing_features = set(feature_mapping[building_type]) - set(selected_features)
     if missing_features:
         st.warning(f"⚠️ The following features are missing in your dataset and will be skipped: {', '.join(missing_features)}")
 
-    # Create inputs dynamically kwa features zilizopo tu
+    # Create inputs  
     for col in selected_features:
         label = friendly_names.get(col, col)
         user_input[col] = st.number_input(
@@ -221,6 +222,7 @@ with right:
 st.divider()
 with st.expander("🔎 View Dataset Preview"):
     st.dataframe(df.head(50))
+
 
 
 
