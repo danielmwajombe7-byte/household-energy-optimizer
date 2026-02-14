@@ -165,12 +165,23 @@ with left:
         c4.metric("📉 RMSE", f"{rmse:.3f}")
 
 
+
 # ================= RIGHT: RESULTS =================
 with right:
     st.subheader("📈 Prediction Results")
 
     if predict_btn:
-        input_df = pd.DataFrame([user_input])
+        # ===== CHANGE START =====
+        # Make sure input_df has ALL features the model expects
+        input_data = {}
+        for col in feature_columns:
+            if col in user_input:
+                input_data[col] = user_input[col]  # take value from user
+            else:
+                input_data[col] = float(df_numeric[col].mean())  # fill missing with mean
+        input_df = pd.DataFrame([input_data])
+        # ===== CHANGE END =====
+
         prediction = model.predict(input_df)[0]
 
         st.markdown(
@@ -204,10 +215,12 @@ with right:
     else:
         st.info("👈 Fill values and click Predict")
 
+
 # =====================================================
 # DATA PREVIEW
 # =====================================================
 st.divider()
 with st.expander("🔎 View Dataset Preview"):
     st.dataframe(df.head(50))
+
 
