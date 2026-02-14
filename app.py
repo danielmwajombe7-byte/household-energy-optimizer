@@ -119,26 +119,19 @@ with left:
     
     st.subheader("🧮 Enter Values for Prediction")
     user_input = {}
-    
-# Feature mapping per building type (only keep existing columns)
-feature_mapping = {
-    "House": [f for f in ["Global_active_power", "Global_reactive_power",
-                  "Voltage", "Global_intensity", "Sub_metering_1", "Sub_metering_2"] if f in df_numeric.columns],
-    "Office": [f for f in ["Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity"] if f in df_numeric.columns],
-    "School": [f for f in ["Global_active_power", "Voltage", "Sub_metering_1", "Sub_metering_3"] if f in df_numeric.columns],
-    "Factory": [f for f in ["Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity", "Sub_metering_3"] if f in df_numeric.columns]
-}
 
+    # Feature mapping per building type (fix for missing columns)
+    feature_mapping = {
+        "House": [f for f in ["Global_active_power", "Global_reactive_power",
+                              "Voltage", "Global_intensity", "Sub_metering_1", "Sub_metering_2"] if f in df_numeric.columns],
+        "Office": [f for f in ["Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity"] if f in df_numeric.columns],
+        "School": [f for f in ["Global_active_power", "Voltage", "Sub_metering_1", "Sub_metering_3"] if f in df_numeric.columns],
+        "Factory": [f for f in ["Global_active_power", "Global_reactive_power", "Voltage", "Global_intensity", "Sub_metering_3"] if f in df_numeric.columns]
+    }
 
-    # filter features dataset
-    selected_features = [f for f in feature_mapping[building_type] if f in df_numeric.columns]
+    selected_features = feature_mapping[building_type]  # <-- make sure no extra spaces before this line
 
-    # if there are features which are not available, show warning
-    missing_features = set(feature_mapping[building_type]) - set(selected_features)
-    if missing_features:
-        st.warning(f"⚠️ The following features are missing in your dataset and will be skipped: {', '.join(missing_features)}")
-
-    # Create inputs  
+    # Create inputs dynamically
     for col in selected_features:
         label = friendly_names.get(col, col)
         user_input[col] = st.number_input(
@@ -222,6 +215,7 @@ with right:
 st.divider()
 with st.expander("🔎 View Dataset Preview"):
     st.dataframe(df.head(50))
+
 
 
 
