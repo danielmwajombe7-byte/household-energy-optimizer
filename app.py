@@ -108,17 +108,19 @@ friendly_names = {
     "Sub_metering_2": "Laundry Power Usage",
     "Sub_metering_3": "Water Heater / AC Usage"
 }
-# =====================================================
-# LEFT SIDE – USER INPUT
-# =====================================================
-with left:
-    st.subheader("🧮 Enter Values for Prediction")
+# ============================================
+# USER INPUT SECTION (NUMBER INPUT BOXES)
+# ============================================
+user_input = {}
 
-  user_input[col] = st.number_input(
-    col,
-    value=float(df_numeric[col].mean()),
-    step=0.1
-)
+for col in feature_columns:
+    label = friendly_names.get(col, col)
+
+    user_input[col] = st.number_input(
+        label=label,
+        value=float(df_numeric[col].mean()),
+        step=0.1
+    )
     predict_btn = st.button("🚀 Predict Energy Consumption", use_container_width=True)
 
 # =====================================================
@@ -189,6 +191,7 @@ df["Datetime"] = pd.to_datetime(
     dayfirst=True,
     errors="coerce"
 )
+
 
 
 
