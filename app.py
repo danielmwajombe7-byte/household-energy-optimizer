@@ -103,15 +103,11 @@ left, right = st.columns([1, 1.4])
 with left:
     st.subheader("🧮 Enter Values for Prediction")
 
-    user_input = {}
-    for col in feature_columns:
-        user_input[col] = st.slider(
-            col,
-            float(df_numeric[col].min()),
-            float(df_numeric[col].max()),
-            float(df_numeric[col].mean())
-        )
-
+  user_input[col] = st.number_input(
+    col,
+    value=float(df_numeric[col].mean()),
+    step=0.1
+)
     predict_btn = st.button("🚀 Predict Energy Consumption", use_container_width=True)
 
 # =====================================================
@@ -182,4 +178,5 @@ df["Datetime"] = pd.to_datetime(
     dayfirst=True,
     errors="coerce"
 )
+
 
