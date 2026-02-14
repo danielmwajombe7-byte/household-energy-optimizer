@@ -29,35 +29,46 @@ Predict • Visualize • Understand Your Power Usage
 st.divider()
 
 # =====================================================
-# LOAD DATA (DIRECT)
+# LOAD & CLEAN DATA (ONCE)
 # =====================================================
 DATA_PATH = "tanzania_power_data.csv"
 
 if not os.path.exists(DATA_PATH):
-    st.error("❌ Dataset haipo. Hakikisha 'tanzania_power_data.csv' ipo folder moja na app.py")
+    st.error("❌ Dataset not found. Make sure CSV is in same folder as app.py")
     st.stop()
 
 @st.cache_data
-def load_data():
-    return pd.read_csv(
-        DATA_PATH,
-        sep=None,
-        engine="python",
-        on_bad_lines="skip"
-    )
+def load_and_clean_data():
+    df = pd.read_csv(DATA_PATH, sep=";", engine="python")
 
-df = load_data()
+    # Combine Date & Time
+    if "Date" in df.columns and "Time" in df.columns:
+        df["Datetime"] = pd.to_datetime(
+            df["Date"] + " " + df["Time"],
+            dayfirst=True,
+            errors="coerce"
+        )
+        df.drop(columns=["Date", "Time"], inplace=True)
 
-# =====================================================
-# CLEAN DATA – Ensure numeric columns exist
-# =====================================================
+    # Convert all to numeric except Datetime
+    for col in df.columns:
+        if col != "Datetime":
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df = df.dropna()
+    return df
+
+df = load_and_clean_data()
+
 df_numeric = df.select_dtypes(include="number")
 
-if df_numeric.shape[1] == 0:
-    st.error("❌ Hakuna numeric columns kwenye dataset. Angalia CSV yako!")
+if df_numeric.shape[1] < 2:
+    st.error("❌ Dataset must contain at least 2 numeric columns")
     st.stop()
 
-# Set target (last numeric column)
+# =====================================================
+# FEATURES & TARGET
+# =====================================================
 target_column = df_numeric.columns[-1]
 feature_columns = df_numeric.columns.drop(target_column)
 
@@ -65,7 +76,7 @@ X = df_numeric[feature_columns]
 y = df_numeric[target_column]
 
 # =====================================================
-# TRAIN MODEL (directly inside app.py)
+# TRAIN MODEL
 # =====================================================
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
@@ -78,14 +89,13 @@ model = RandomForestRegressor(
 )
 model.fit(X_train, y_train)
 
-preds = model.predict(X_test)
-rmse = np.sqrt(mean_squared_error(y_test, preds))
+rmse = np.sqrt(mean_squared_error(y_test, model.predict(X_test)))
 
 # =====================================================
-# DASHBOARD METRICS
+# METRICS
 # =====================================================
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("📄 Records", f"{len(df):,}")
+c1.metric("📄 Records", len(df))
 c2.metric("📊 Features", len(feature_columns))
 c3.metric("🎯 Target", target_column)
 c4.metric("📉 RMSE", f"{rmse:.3f}")
@@ -93,12 +103,8 @@ c4.metric("📉 RMSE", f"{rmse:.3f}")
 st.divider()
 
 # =====================================================
-# TWO COLUMN DASHBOARD
+# FRIENDLY COLUMN NAMES
 # =====================================================
-left, right = st.columns([1, 1.4])
-
-
-#friendly names for user
 friendly_names = {
     "Global_active_power": "Total Power Used (kW)",
     "Global_reactive_power": "Extra Power Loss",
@@ -108,24 +114,34 @@ friendly_names = {
     "Sub_metering_2": "Laundry Power Usage",
     "Sub_metering_3": "Water Heater / AC Usage"
 }
-# ============================================
-# USER INPUT SECTION (NUMBER INPUT BOXES)
-# ============================================
-user_input = {}
 
-for col in feature_columns:
-    label = friendly_names.get(col, col)
+# =====================================================
+# TWO COLUMN LAYOUT
+# =====================================================
+left, right = st.columns([1, 1.4])
 
-    user_input[col] = st.number_input(
-        label=label,
-        value=float(df_numeric[col].mean()),
-        step=0.1
+# ================= LEFT: USER INPUT =================
+with left:
+    st.subheader("🧮 Enter Values for Prediction")
+
+    user_input = {}
+
+    for col in feature_columns:
+        label = friendly_names.get(col, col)
+
+        user_input[col] = st.number_input(
+            label,
+            value=float(df_numeric[col].mean()),
+            step=0.1
+        )
+
+    predict_btn = st.button(
+        "🚀 Predict Energy Consumption",
+        use_container_width=True,
+        key="predict_btn"
     )
-    predict_btn = st.button("🚀 Predict Energy Consumption", use_container_width=True)
 
-# =====================================================
-# RIGHT SIDE – RESULTS + ZOOM EFFECT
-# =====================================================
+# ================= RIGHT: RESULTS =================
 with right:
     st.subheader("📈 Prediction Results")
 
@@ -133,27 +149,20 @@ with right:
         input_df = pd.DataFrame([user_input])
         prediction = model.predict(input_df)[0]
 
-        st.markdown(f"""
-        <h2 style='color:#ff7f0e;'>⚡ Predicted Consumption</h2>
-        <h1>{prediction:.3f}</h1>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            f"<h2 style='color:#ff7f0e;'>⚡ Predicted Consumption</h2>"
+            f"<h1>{prediction:.3f}</h1>",
+            unsafe_allow_html=True
+        )
 
         if prediction > y.mean():
-            st.warning("⚠️ High energy usage detected. Consider reducing heavy appliances.")
+            st.warning("⚠️ High energy usage detected. Reduce heavy appliances.")
         else:
-            st.success("✅ Energy usage is within normal range.")
+            st.success("✅ Energy usage is normal.")
 
-        # ===============================
-        # ZOOM IN → OUT VISUALIZATION
-        # ===============================
         zoom_df = pd.DataFrame({
             "Stage": ["Low", "Average", "Your Prediction", "High"],
-            "Consumption": [
-                y.min(),
-                y.mean(),
-                prediction,
-                y.max()
-            ]
+            "Consumption": [y.min(), y.mean(), prediction, y.max()]
         })
 
         fig = px.line(
@@ -161,37 +170,19 @@ with right:
             x="Stage",
             y="Consumption",
             markers=True,
-            title="🔍 Zoom View of Your Energy Consumption",
-            line_shape="spline"
-        )
-
-        fig.update_traces(
-            marker=dict(size=14),
-            line=dict(width=4)
-        )
-
-        fig.update_layout(
-            transition_duration=1200,
+            title="🔍 Energy Usage Comparison",
+            line_shape="spline",
             template="plotly_white"
         )
 
         st.plotly_chart(fig, use_container_width=True)
 
     else:
-        st.info("👈 Enter values and click **Predict** to see results")
+        st.info("👈 Fill values and click Predict")
 
 # =====================================================
 # DATA PREVIEW
 # =====================================================
 st.divider()
 with st.expander("🔎 View Dataset Preview"):
-    st.dataframe(df.head(100))
-df["Datetime"] = pd.to_datetime(
-    df["Date"] + " " + df["Time"],
-    dayfirst=True,
-    errors="coerce"
-)
-
-
-
-
+    st.dataframe(df.head(50))
