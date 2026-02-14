@@ -108,7 +108,6 @@ friendly_names = {
 left, right = st.columns([1, 1.4])
 
 # ================= LEFT: BUILDING TYPE & INPUTS =================
-# ================= LEFT: BUILDING TYPE & INPUTS =================
 with left:
     st.subheader("🏠 Select Building Type")
     building_type = st.selectbox(
@@ -222,5 +221,6 @@ with right:
 st.divider()
 with st.expander("🔎 View Dataset Preview"):
     st.dataframe(df.head(50))
+
 
 
