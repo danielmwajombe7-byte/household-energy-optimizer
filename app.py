@@ -97,6 +97,17 @@ st.divider()
 # =====================================================
 left, right = st.columns([1, 1.4])
 
+
+#friendly names for user
+friendly_names = {
+    "Global_active_power": "Total Power Used (kW)",
+    "Global_reactive_power": "Extra Power Loss",
+    "Voltage": "Electric Voltage (V)",
+    "Global_intensity": "Current Intensity (A)",
+    "Sub_metering_1": "Kitchen Power Usage",
+    "Sub_metering_2": "Laundry Power Usage",
+    "Sub_metering_3": "Water Heater / AC Usage"
+}
 # =====================================================
 # LEFT SIDE – USER INPUT
 # =====================================================
@@ -178,5 +189,6 @@ df["Datetime"] = pd.to_datetime(
     dayfirst=True,
     errors="coerce"
 )
+
 
 
