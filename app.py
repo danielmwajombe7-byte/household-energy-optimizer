@@ -14,21 +14,35 @@ st.set_page_config(
 )
 
 # =====================================================
-# MINI BUILT-IN DATASET
+# LOAD DATA (Mini dataset as fallback)
 # =====================================================
 @st.cache_data
 def load_data():
-    df = pd.DataFrame({
-        "Voltage": [220, 230, 210, 225, 240, 200, 215, 235, 220, 210],
-        "Current": [5, 6, 4.5, 5.5, 6.5, 4, 4.8, 6, 5.2, 4.6],
-        "Kitchen_Power": [1.2, 1.5, 1.0, 1.3, 1.8, 0.9, 1.1, 1.6, 1.4, 1.0],
-        "Laundry_Power": [0.8, 1.0, 0.6, 0.9, 1.2, 0.5, 0.7, 1.1, 0.9, 0.6],
-        "Extra_Loss": [0.3, 0.4, 0.2, 0.35, 0.5, 0.15, 0.25, 0.45, 0.3, 0.2]
-    })
+    try:
+        df = pd.read_csv("tanzania_power_data.csv", sep=";", engine="python")
+        # convert Date & Time if exist
+        if "Date" in df.columns and "Time" in df.columns:
+            df["Datetime"] = pd.to_datetime(df["Date"] + " " + df["Time"],
+                                            dayfirst=True, errors="coerce")
+            df.drop(columns=["Date", "Time"], inplace=True)
+        for col in df.columns:
+            if col != "Datetime":
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+        df.dropna(inplace=True)
+    except Exception:
+        # fallback mini dataset
+        df = pd.DataFrame({
+            "Voltage": [220, 230, 210, 225, 240, 200, 215, 235, 220, 210],
+            "Current": [5, 6, 4.5, 5.5, 6.5, 4, 4.8, 6, 5.2, 4.6],
+            "Kitchen_Power": [1.2, 1.5, 1.0, 1.3, 1.8, 0.9, 1.1, 1.6, 1.4, 1.0],
+            "Laundry_Power": [0.8, 1.0, 0.6, 0.9, 1.2, 0.5, 0.7, 1.1, 0.9, 0.6],
+            "Extra_Loss": [0.3, 0.4, 0.2, 0.35, 0.5, 0.15, 0.25, 0.45, 0.3, 0.2]
+        })
     df["Global_active_power"] = df["Kitchen_Power"] + df["Laundry_Power"] + df["Extra_Loss"]
     return df
 
 df = load_data()
+
 FEATURES = ["Voltage", "Current", "Kitchen_Power", "Laundry_Power", "Extra_Loss"]
 TARGET = "Global_active_power"
 
@@ -141,69 +155,3 @@ if st.button("⚡ Predict Energy Consumption", use_container_width=True):
         st.markdown("### 📌 Smart Advice")
 
         if prediction > avg * 1.3:
-            st.error("""
-            ⚠️ **Very High Energy Consumption**
-            
-            Possible causes:
-            - Many high-power appliances used at the same time
-            
-            Advice:
-            - Avoid using cooker, iron and washing machine together  
-            - Shift laundry to off-peak hours  
-            - Switch off unused devices
-            """)
-        elif prediction > avg:
-            st.warning("""
-            ⚠️ **Moderately High Consumption**
-            
-            Advice:
-            - Reduce kitchen appliance usage  
-            - Use energy-saving bulbs
-            """)
-        else:
-            st.success("""
-            ✅ **Energy Usage is Efficient**
-            
-            - You are using electricity wisely  
-            - Keep it up 💚
-            """)
-
-        # =====================================================
-        # VISUALIZATION
-        # =====================================================
-        st.markdown("### 📊 Energy Consumption Comparison")
-
-        graph_type = st.radio(
-            "Select Graph Type",
-            ["Bar Chart", "Line Chart"],
-            horizontal=True
-        )
-
-        plot_df = pd.DataFrame({
-            "Level": ["Low", "Average", "Your Usage", "High"],
-            "Power (kW)": [
-                df[TARGET].min(),
-                avg,
-                prediction,
-                df[TARGET].max()
-            ]
-        })
-
-        if graph_type == "Bar Chart":
-            fig = px.bar(
-                plot_df,
-                x="Level",
-                y="Power (kW)",
-                color="Level",
-                template="plotly_white"
-            )
-        else:
-            fig = px.line(
-                plot_df,
-                x="Level",
-                y="Power (kW)",
-                markers=True,
-                template="plotly_white"
-            )
-
-        st.plotly_chart(fig, use_container_width=True)
