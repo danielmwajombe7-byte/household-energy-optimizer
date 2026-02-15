@@ -14,13 +14,18 @@ st.set_page_config(
 )
 
 # =====================================================
-# LOAD DATA (Mini dataset as fallback)
+# SIDEBAR NAVIGATION
+# =====================================================
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to", ["User Info", "Prediction", "Visualization"])
+
+# =====================================================
+# LOAD DATA
 # =====================================================
 @st.cache_data
 def load_data():
     try:
         df = pd.read_csv("tanzania_power_data.csv", sep=";", engine="python")
-        # convert Date & Time if exist
         if "Date" in df.columns and "Time" in df.columns:
             df["Datetime"] = pd.to_datetime(df["Date"] + " " + df["Time"],
                                             dayfirst=True, errors="coerce")
@@ -30,7 +35,7 @@ def load_data():
                 df[col] = pd.to_numeric(df[col], errors="coerce")
         df.dropna(inplace=True)
     except Exception:
-        # fallback mini dataset
+        # Fallback mini dataset
         df = pd.DataFrame({
             "Voltage": [220, 230, 210, 225, 240, 200, 215, 235, 220, 210],
             "Current": [5, 6, 4.5, 5.5, 6.5, 4, 4.8, 6, 5.2, 4.6],
@@ -60,80 +65,72 @@ def train_model(df):
 model = train_model(df)
 
 # =====================================================
-# HEADER
+# PAGE 1: USER INFORMATION
 # =====================================================
-st.markdown("""
-<div style="
-    background: linear-gradient(90deg,#0f2027,#203a43,#2c5364);
-    padding:30px;
-    border-radius:15px;
-    text-align:center;
-    margin-bottom:30px;
-">
-<div style="font-size:55px;color:#facc15;">💡</div>
-<h1 style="color:white;">Smart Energy Consumption AI App</h1>
-<p style="color:#d1d5db;">
-Machine Learning Based Energy Prediction
-</p>
-</div>
-""", unsafe_allow_html=True)
+if page == "User Info":
+    st.markdown("""
+    <div style="
+        background: linear-gradient(90deg,#0f2027,#203a43,#2c5364);
+        padding:30px;
+        border-radius:15px;
+        text-align:center;
+        margin-bottom:30px;
+    ">
+    <div style="font-size:55px;color:#facc15;">💡</div>
+    <h1 style="color:white;">Smart Energy Consumption AI App</h1>
+    <p style="color:#d1d5db;">Machine Learning Based Energy Prediction</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-# =====================================================
-# USER INPUT
-# =====================================================
-st.subheader("👤 User Information")
-
-name = st.text_input("Enter your name")
-building = st.selectbox(
-    "Select Building Type",
-    ["House", "Office", "School", "Factory"]
-)
-
-st.divider()
-
-st.markdown(
-    "<h3 style='text-align:center;color:#1e3a8a;'>ENTER VALUES FOR PREDICTION</h3>",
-    unsafe_allow_html=True
-)
-
-col1, col2 = st.columns(2)
-user_input = {}
-
-with col1:
-    user_input["Extra_Loss"] = st.number_input(
-        "Extra Power Loss",
-        value=float(df["Extra_Loss"].mean())
-    )
-    user_input["Voltage"] = st.number_input(
-        "Electric Voltage (V)",
-        value=float(df["Voltage"].mean())
-    )
-    user_input["Kitchen_Power"] = st.number_input(
-        "Kitchen Power Usage",
-        value=float(df["Kitchen_Power"].mean())
+    st.subheader("👤 User Information")
+    name = st.text_input("Enter your name")
+    building = st.selectbox(
+        "Select Building Type",
+        ["House", "Office", "School", "Factory"]
     )
 
-with col2:
-    user_input["Current"] = st.number_input(
-        "Current Intensity (A)",
-        value=float(df["Current"].mean())
-    )
-    user_input["Laundry_Power"] = st.number_input(
-        "Laundry Power Usage",
-        value=float(df["Laundry_Power"].mean())
-    )
-
-st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("Save User Info"):
+        if name.strip() == "":
+            st.warning("Please enter your name")
+        else:
+            st.success(f"User info saved! Name: {name} | Building: {building}")
+            st.session_state["name"] = name
+            st.session_state["building"] = building
 
 # =====================================================
-# PREDICTION
+# PAGE 2: INPUT & PREDICTION
 # =====================================================
-if st.button("⚡ Predict Energy Consumption", use_container_width=True):
+elif page == "Prediction":
+    st.subheader("⚡ Enter Values for Prediction")
 
-    if name.strip() == "":
-        st.warning("Please enter your name")
-    else:
-        # Ensure input columns match FEATURES exactly
+    col1, col2 = st.columns(2)
+    user_input = {}
+
+    with col1:
+        user_input["Extra_Loss"] = st.number_input(
+            "Extra Power Loss", value=float(df["Extra_Loss"].mean())
+        )
+        user_input["Voltage"] = st.number_input(
+            "Electric Voltage (V)", value=float(df["Voltage"].mean())
+        )
+        user_input["Kitchen_Power"] = st.number_input(
+            "Kitchen Power Usage", value=float(df["Kitchen_Power"].mean())
+        )
+
+    with col2:
+        user_input["Current"] = st.number_input(
+            "Current Intensity (A)", value=float(df["Current"].mean())
+        )
+        user_input["Laundry_Power"] = st.number_input(
+            "Laundry Power Usage", value=float(df["Laundry_Power"].mean())
+        )
+
+    if st.button("⚡ Predict Energy Consumption", use_container_width=True):
+        # Ensure session info exists
+        name = st.session_state.get("name", "Unknown User")
+        building = st.session_state.get("building", "Unknown Building")
+
+        # Prediction
         input_df = pd.DataFrame([{f: user_input[f] for f in FEATURES}])
         prediction = model.predict(input_df)[0]
         avg = df[TARGET].mean()
@@ -149,9 +146,75 @@ if st.button("⚡ Predict Energy Consumption", use_container_width=True):
         </div>
         """, unsafe_allow_html=True)
 
-        # =====================================================
-        # ADVICE
-        # =====================================================
+        # Advice
         st.markdown("### 📌 Smart Advice")
-
         if prediction > avg * 1.3:
+            st.error("""
+            ⚠️ **Very High Energy Consumption**
+            
+            Possible causes:
+            - Many high-power appliances used at the same time
+            
+            Advice:
+            - Avoid using cooker, iron and washing machine together  
+            - Shift laundry to off-peak hours  
+            - Switch off unused devices
+            """)
+        elif prediction > avg:
+            st.warning("""
+            ⚠️ **Moderately High Consumption**
+            
+            Advice:
+            - Reduce kitchen appliance usage  
+            - Use energy-saving bulbs
+            """)
+        else:
+            st.success("""
+            ✅ **Energy Usage is Efficient**
+            
+            - You are using electricity wisely  
+            - Keep it up 💚
+            """)
+
+# =====================================================
+# PAGE 3: VISUALIZATION
+# =====================================================
+elif page == "Visualization":
+    st.subheader("📊 Energy Consumption Comparison")
+
+    # Retrieve prediction if exists
+    input_df = pd.DataFrame([{f: st.session_state.get(f, df[f].mean()) for f in FEATURES}])
+    prediction = model.predict(input_df)[0] if "name" in st.session_state else df[TARGET].mean()
+    avg = df[TARGET].mean()
+
+    # Select graph type
+    graph_type = st.selectbox("Select Graph Type", ["Bar Chart", "Line Chart"])
+
+    plot_df = pd.DataFrame({
+        "Level": ["Low", "Average", "Your Usage", "High"],
+        "Power (kW)": [
+            df[TARGET].min(),
+            avg,
+            prediction,
+            df[TARGET].max()
+        ]
+    })
+
+    if graph_type == "Bar Chart":
+        fig = px.bar(
+            plot_df,
+            x="Level",
+            y="Power (kW)",
+            color="Level",
+            template="plotly_white"
+        )
+    else:
+        fig = px.line(
+            plot_df,
+            x="Level",
+            y="Power (kW)",
+            markers=True,
+            template="plotly_white"
+        )
+
+    st.plotly_chart(fig, use_container_width=True)
