@@ -5,26 +5,24 @@ from sklearn.tree import DecisionTreeRegressor
 import numpy as np
 
 # ==========================
-# Page config
+# PAGE CONFIG
 # ==========================
 st.set_page_config(page_title="Smart Energy Consumption", page_icon="⚡", layout="wide")
 
 # ==========================
-# Load dataset safely
+# LOAD DATA (Safe + fallback)
 # ==========================
 @st.cache_data
 def load_data():
     try:
         df = pd.read_csv("tanzania_power_data.csv", sep=";", engine="python")
+
+        # Convert Date & Time if exist
         if "Date" in df.columns and "Time" in df.columns:
             df["Datetime"] = pd.to_datetime(df["Date"] + " " + df["Time"], dayfirst=True, errors="coerce")
             df.drop(columns=["Date", "Time"], inplace=True)
-        for col in df.columns:
-            if col != "Datetime":
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-        df.dropna(inplace=True)
 
-        # Map CSV columns to our standard names
+        # Map CSV columns to standard features
         col_map = {}
         if "Sub_metering_1" in df.columns:
             col_map["Sub_metering_1"] = "Kitchen_Power"
@@ -32,8 +30,6 @@ def load_data():
             col_map["Sub_metering_2"] = "Laundry_Power"
         if "Global_reactive_power" in df.columns:
             col_map["Global_reactive_power"] = "Extra_Loss"
-        if "Voltage" not in df.columns:
-            df["Voltage"] = 230  # default value
         if "Global_intensity" in df.columns:
             col_map["Global_intensity"] = "Current"
 
@@ -44,7 +40,12 @@ def load_data():
             if col not in df.columns:
                 df[col] = 0.0
 
-        # Target
+        # Convert all to numeric
+        for col in ["Voltage", "Current", "Kitchen_Power", "Laundry_Power", "Extra_Loss"]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        df.dropna(inplace=True)
+        # Create target
         df["Global_active_power"] = df["Kitchen_Power"] + df["Laundry_Power"] + df["Extra_Loss"]
 
     except Exception:
@@ -62,19 +63,11 @@ def load_data():
 
 df = load_data()
 
-# ==========================
-# Features / target
-# ==========================
 FEATURES = ["Voltage", "Current", "Kitchen_Power", "Laundry_Power", "Extra_Loss"]
 TARGET = "Global_active_power"
 
-# Make sure all features exist
-for col in FEATURES:
-    if col not in df.columns:
-        df[col] = 0.0
-
 # ==========================
-# Train model
+# TRAIN MODEL
 # ==========================
 @st.cache_resource
 def train_model(df):
@@ -86,4 +79,90 @@ def train_model(df):
 
 model = train_model(df)
 
-st.success("✅ Dataset loaded and model trained successfully!")
+# ==========================
+# SIDEBAR MENU
+# ==========================
+st.sidebar.title("📂 Menu")
+page = st.sidebar.radio("Go to", ["Home", "Prediction", "Visualization"])
+
+# ==========================
+# PAGE 1: HOME / HEADER
+# ==========================
+if page == "Home":
+    st.markdown("""
+    <div style="background: linear-gradient(90deg,#0f2027,#203a43,#2c5364);
+                padding:30px; border-radius:15px; text-align:center;">
+        <div style="font-size:55px;color:#facc15;">💡</div>
+        <h1 style="color:white;">Smart Energy Consumption AI App</h1>
+        <p style="color:#d1d5db;">Machine Learning Based Energy Prediction</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.subheader("👤 User Information")
+    name = st.text_input("Enter your name")
+    building = st.selectbox("Select Building Type", ["House", "Office", "School", "Factory"])
+
+# ==========================
+# PAGE 2: PREDICTION
+# ==========================
+elif page == "Prediction":
+    st.subheader("⚡ Energy Prediction Inputs")
+
+    col1, col2 = st.columns(2)
+    user_input = {}
+
+    with col1:
+        user_input["Extra_Loss"] = st.number_input("Extra Power Loss", value=float(df["Extra_Loss"].mean()))
+        user_input["Voltage"] = st.number_input("Electric Voltage (V)", value=float(df["Voltage"].mean()))
+        user_input["Kitchen_Power"] = st.number_input("Kitchen Power Usage", value=float(df["Kitchen_Power"].mean()))
+    with col2:
+        user_input["Current"] = st.number_input("Current Intensity (A)", value=float(df["Current"].mean()))
+        user_input["Laundry_Power"] = st.number_input("Laundry Power Usage", value=float(df["Laundry_Power"].mean()))
+
+    if st.button("⚡ Predict Energy Consumption", use_container_width=True):
+        # Prepare input
+        input_df = pd.DataFrame([{f: user_input[f] for f in FEATURES}])
+        prediction = model.predict(input_df)[0]
+        avg = df[TARGET].mean()
+
+        st.markdown(f"""
+        <div style="text-align:center; background:#ecfeff; padding:25px; border-radius:15px;">
+            <h2>⚡ Predicted Energy Consumption</h2>
+            <h1 style="color:#0f766e;">{prediction:.2f} kW</h1>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Advice
+        st.markdown("### 📌 Smart Advice")
+        if prediction > avg * 1.3:
+            st.error("⚠️ Very High Energy Consumption\n- Avoid using high-power devices simultaneously\n- Shift laundry to off-peak hours\n- Switch off unused devices")
+        elif prediction > avg:
+            st.warning("⚠️ Moderately High Consumption\n- Reduce kitchen appliance usage\n- Use energy-saving bulbs")
+        else:
+            st.success("✅ Energy Usage is Efficient\n- You are using electricity wisely")
+
+# ==========================
+# PAGE 3: VISUALIZATION
+# ==========================
+elif page == "Visualization":
+    st.subheader("📊 Energy Consumption Comparison")
+
+    graph_type = st.selectbox("Select Graph Type", ["Bar Chart", "Line Chart"])
+
+    # Use last predicted value if exists, else average
+    try:
+        last_pred = prediction
+    except NameError:
+        last_pred = df[TARGET].mean()
+
+    plot_df = pd.DataFrame({
+        "Level": ["Low", "Average", "Your Usage", "High"],
+        "Power (kW)": [df[TARGET].min(), df[TARGET].mean(), last_pred, df[TARGET].max()]
+    })
+
+    if graph_type == "Bar Chart":
+        fig = px.bar(plot_df, x="Level", y="Power (kW)", color="Level", template="plotly_white")
+    else:
+        fig = px.line(plot_df, x="Level", y="Power (kW)", markers=True, template="plotly_white")
+
+    st.plotly_chart(fig, use_container_width=True)
