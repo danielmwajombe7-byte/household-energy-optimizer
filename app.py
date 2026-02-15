@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # =====================================================
-# MINI BUILT-IN DATASET (for demonstration)
+# MINI BUILT-IN DATASET
 # =====================================================
 @st.cache_data
 def load_data():
@@ -33,7 +33,7 @@ FEATURES = ["Voltage", "Current", "Kitchen_Power", "Laundry_Power", "Extra_Loss"
 TARGET = "Global_active_power"
 
 # =====================================================
-# TRAIN MODEL (Decision Tree)
+# TRAIN MODEL
 # =====================================================
 @st.cache_resource
 def train_model(df):
@@ -65,7 +65,7 @@ Machine Learning Based Energy Prediction
 """, unsafe_allow_html=True)
 
 # =====================================================
-# USER INPUT SECTION
+# USER INPUT
 # =====================================================
 st.subheader("👤 User Information")
 
@@ -119,7 +119,8 @@ if st.button("⚡ Predict Energy Consumption", use_container_width=True):
     if name.strip() == "":
         st.warning("Please enter your name")
     else:
-        input_df = pd.DataFrame([user_input])
+        # Ensure input columns match FEATURES exactly
+        input_df = pd.DataFrame([{f: user_input[f] for f in FEATURES}])
         prediction = model.predict(input_df)[0]
         avg = df[TARGET].mean()
 
@@ -135,7 +136,7 @@ if st.button("⚡ Predict Energy Consumption", use_container_width=True):
         """, unsafe_allow_html=True)
 
         # =====================================================
-        # ADVICE SECTION
+        # ADVICE
         # =====================================================
         st.markdown("### 📌 Smart Advice")
 
