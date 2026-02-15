@@ -116,4 +116,72 @@ elif page == "Prediction":
     st.session_state.user_info["name"] = st.text_input("Enter your name", value=st.session_state.user_info["name"])
     st.session_state.user_info["building"] = st.selectbox(
         "Select Building Type",
-        ["House",]()
+        ["House", "Office", "School", "Factory"],
+        index=0 if st.session_state.user_info["building"] is None else ["House","Office","School","Factory"].index(st.session_state.user_info["building"])
+    )
+
+    if not st.session_state.user_info["name"] or not st.session_state.user_info["building"]:
+        st.warning("Please enter your name and select building type to predict.")
+    else:
+        st.markdown("### ⚡ Energy Prediction Inputs")
+        col1, col2 = st.columns(2)
+        input_values = {}
+        with col1:
+            input_values["Extra_Loss"] = st.number_input("Extra Power Loss", value=float(df["Extra_Loss"].mean()))
+            input_values["Voltage"] = st.number_input("Electric Voltage (V)", value=float(df["Voltage"].mean()))
+            input_values["Kitchen_Power"] = st.number_input("Kitchen Power Usage", value=float(df["Kitchen_Power"].mean()))
+        with col2:
+            input_values["Current"] = st.number_input("Current Intensity (A)", value=float(df["Current"].mean()))
+            input_values["Laundry_Power"] = st.number_input("Laundry Power Usage", value=float(df["Laundry_Power"].mean()))
+
+        if st.button("⚡ Predict Energy Consumption", use_container_width=True):
+            input_df = pd.DataFrame([{f: input_values[f] for f in FEATURES}])
+            st.session_state.prediction = model.predict(input_df)[0]
+            avg = df[TARGET].mean()
+
+            # Display Prediction
+            st.markdown(f"""
+            <div style="text-align:center; background:#ecfeff; padding:25px; border-radius:15px;">
+                <h2>⚡ Predicted Energy Consumption</h2>
+                <h1 style="color:#0f766e;">{st.session_state.prediction:.2f} kW</h1>
+                <p>User: <b>{st.session_state.user_info['name']}</b> | Building: <b>{st.session_state.user_info['building']}</b></p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Advice
+            st.markdown("### 📌 Smart Advice")
+            if st.session_state.prediction > avg * 1.3:
+                st.error("- ⚠️ Very High Energy Consumption\n- Avoid using high-power devices simultaneously\n- Shift laundry to off-peak hours\n- Switch off unused devices")
+            elif st.session_state.prediction > avg:
+                st.warning("- ⚠️ Moderately High Consumption\n- Reduce kitchen appliance usage\n- Use energy-saving bulbs")
+            else:
+                st.success("- ✅ Energy Usage is Efficient\n- You are using electricity wisely")
+
+# ==========================
+# PAGE 3: VISUALIZATION
+# ==========================
+elif page == "Visualization":
+    st.subheader("📊 Energy Consumption Comparison")
+    graph_type = st.selectbox("Select Graph Type", ["Bar Chart", "Line Chart", "Area Chart", "Scatter Plot", "Pie Chart"])
+
+    if st.session_state.prediction is None:
+        st.warning("Please make a prediction first on the Prediction page.")
+    else:
+        last_pred = st.session_state.prediction
+        plot_df = pd.DataFrame({
+            "Level": ["Low", "Average", "Your Usage", "High"],
+            "Power (kW)": [df[TARGET].min(), df[TARGET].mean(), last_pred, df[TARGET].max()]
+        })
+
+        if graph_type == "Bar Chart":
+            fig = px.bar(plot_df, x="Level", y="Power (kW)", color="Level", template="plotly_white")
+        elif graph_type == "Line Chart":
+            fig = px.line(plot_df, x="Level", y="Power (kW)", markers=True, template="plotly_white")
+        elif graph_type == "Area Chart":
+            fig = px.area(plot_df, x="Level", y="Power (kW)", template="plotly_white")
+        elif graph_type == "Scatter Plot":
+            fig = px.scatter(plot_df, x="Level", y="Power (kW)", size="Power (kW)", color="Level", template="plotly_white")
+        elif graph_type == "Pie Chart":
+            fig = px.pie(plot_df, values="Power (kW)", names="Level", template="plotly_white")
+
+        st.plotly_chart(fig, use_container_width=True)
