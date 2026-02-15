@@ -1,218 +1,140 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import joblib
+import numpy as np
+import pickle
+import matplotlib.pyplot as plt
 
-# =====================================================
+# ===============================
 # PAGE CONFIG
-# =====================================================
+# ===============================
 st.set_page_config(
-    page_title="Smart Energy Consumption",
-    page_icon="⚡",
+    page_title="⚡ Smart Energy Consumption AI",
+    page_icon="💡",
     layout="wide"
 )
 
-# =====================================================
-# LOAD TRAINED MODEL (IMPORTANT FOR TEST 2)
-# =====================================================
+# ===============================
+# LOAD MODEL
+# ===============================
 @st.cache_resource
 def load_model():
-    return joblib.load("model.pkl")
+    with open("model.pkl", "rb") as file:
+        model = pickle.load(file)
+    return model
 
 model = load_model()
 
-# =====================================================
-# LOAD DATA (FOR MEAN / VISUALIZATION ONLY)
-# =====================================================
-@st.cache_data
-def load_data():
-    df = pd.read_csv("tanzania_power_data.csv", sep=";", engine="python")
-
-    if "Date" in df.columns and "Time" in df.columns:
-        df["Datetime"] = pd.to_datetime(
-            df["Date"] + " " + df["Time"],
-            dayfirst=True,
-            errors="coerce"
-        )
-        df.drop(columns=["Date", "Time"], inplace=True)
-
-    for col in df.columns:
-        if col != "Datetime":
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    return df.dropna()
-
-df = load_data()
-df_num = df.select_dtypes(include="number")
-
-TARGET = "Global_active_power"
-FEATURES = df_num.columns.drop(TARGET)
-
-# =====================================================
-# HEADER
-# =====================================================
-st.markdown("""
-<div style="
-    background: linear-gradient(90deg,#0f2027,#203a43,#2c5364);
-    padding:30px;
-    border-radius:15px;
-    text-align:center;
-    margin-bottom:30px;
-">
-<div style="font-size:55px;color:#facc15;">💡</div>
-<h1 style="color:white;">Smart Energy Consumption AI App</h1>
-<p style="color:#d1d5db;">
-Machine Learning Based Energy Prediction
-</p>
-</div>
-""", unsafe_allow_html=True)
-
-# =====================================================
-# USER INPUT SECTION
-# =====================================================
-st.subheader("👤 User Information")
-
-name = st.text_input("Enter your name")
-building = st.selectbox(
-    "Select Building Type",
-    ["House", "Office", "School", "Factory"]
+# ===============================
+# SIDEBAR NAVIGATION
+# ===============================
+st.sidebar.title("⚡ Energy AI App")
+menu = st.sidebar.radio(
+    "Navigation",
+    ["🏠 Home", "📊 Dashboard", "🤖 Prediction", "📈 Visualization", "ℹ️ About"]
 )
 
-st.divider()
+# ===============================
+# HOME PAGE
+# ===============================
+if menu == "🏠 Home":
+    st.title("⚡ Smart Energy Consumption AI System")
+    st.markdown("""
+    💡 **AI-powered system for predicting electricity consumption**  
 
-st.markdown(
-    "<h3 style='text-align:center;color:#1e3a8a;'>ENTER VALUES FOR PREDICTION</h3>",
-    unsafe_allow_html=True
-)
+    ### 🎯 Objectives
+    - Predict energy consumption based on user inputs  
+    - Compare Machine Learning models  
+    - Visualize power usage patterns  
+    - Support smart energy decision making  
 
-col1, col2 = st.columns(2)
-user_input = {}
+    👉 Use the sidebar to navigate.
+    """)
 
-with col1:
-    user_input["Global_reactive_power"] = st.number_input(
-        "Extra Power Loss",
-        value=float(df_num["Global_reactive_power"].mean())
+# ===============================
+# DASHBOARD
+# ===============================
+elif menu == "📊 Dashboard":
+    st.title("📊 Energy Dashboard")
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("⚡ Voltage (V)", "220 V")
+    col2.metric("🔌 Average Power", "3.5 kW")
+    col3.metric("💡 Status", "Normal Usage")
+
+    st.info("Dashboard overview showing general electricity indicators.")
+
+# ===============================
+# PREDICTION PAGE
+# ===============================
+elif menu == "🤖 Prediction":
+    st.title("🤖 Energy Consumption Prediction")
+
+    st.subheader("🔢 Enter Input Values")
+
+    voltage = st.number_input("Electric Voltage (V)", min_value=180, max_value=260, value=220)
+    current = st.number_input("Current Intensity (A)", min_value=0.1, value=5.0)
+    kitchen = st.number_input("Kitchen Power Usage (kW)", min_value=0.0, value=1.2)
+    laundry = st.number_input("Laundry Power Usage (kW)", min_value=0.0, value=0.8)
+    extra_loss = st.number_input("Extra Power Loss (kW)", min_value=0.0, value=0.3)
+
+    if st.button("⚡ Predict Energy Consumption"):
+        input_data = np.array([[voltage, current, kitchen, laundry, extra_loss]])
+        prediction = model.predict(input_data)
+
+        st.success(f"🔮 **Predicted Total Power Used:** {prediction[0]:.2f} kW")
+
+# ===============================
+# VISUALIZATION PAGE
+# ===============================
+elif menu == "📈 Visualization":
+    st.title("📈 Energy Consumption Visualization")
+
+    graph_type = st.selectbox(
+        "Select Graph Type",
+        ["Bar Chart", "Line Graph", "Scatter Plot"]
     )
-    user_input["Voltage"] = st.number_input(
-        "Electric Voltage (V)",
-        value=float(df_num["Voltage"].mean())
-    )
-    user_input["Sub_metering_1"] = st.number_input(
-        "Kitchen Power Usage",
-        value=float(df_num["Sub_metering_1"].mean())
-    )
 
-with col2:
-    user_input["Global_intensity"] = st.number_input(
-        "Current Intensity (A)",
-        value=float(df_num["Global_intensity"].mean())
-    )
-    user_input["Sub_metering_2"] = st.number_input(
-        "Laundry Power Usage",
-        value=float(df_num["Sub_metering_2"].mean())
-    )
-    user_input["Sub_metering_3"] = st.number_input(
-        "Other Appliances Usage",
-        value=float(df_num["Sub_metering_3"].mean())
-    )
+    sample_data = pd.DataFrame({
+        "Category": ["Kitchen", "Laundry", "Extra Loss"],
+        "Power (kW)": [1.2, 0.8, 0.3]
+    })
 
-st.markdown("<br>", unsafe_allow_html=True)
+    fig, ax = plt.subplots()
 
-# =====================================================
-# PREDICTION
-# =====================================================
-if st.button("⚡ Predict Energy Consumption", use_container_width=True):
+    if graph_type == "Bar Chart":
+        ax.bar(sample_data["Category"], sample_data["Power (kW)"])
+        ax.set_title("Power Usage by Category")
 
-    if name.strip() == "":
-        st.warning("Please enter your name")
-    else:
-        # Prepare full feature input
-        full_input = {f: user_input.get(f, float(df_num[f].mean())) for f in FEATURES}
-        input_df = pd.DataFrame([full_input])
+    elif graph_type == "Line Graph":
+        ax.plot(sample_data["Category"], sample_data["Power (kW)"], marker="o")
+        ax.set_title("Energy Consumption Trend")
 
-        prediction = model.predict(input_df)[0]
-        avg = df_num[TARGET].mean()
+    elif graph_type == "Scatter Plot":
+        ax.scatter(sample_data["Category"], sample_data["Power (kW)"])
+        ax.set_title("Power Distribution")
 
-        st.markdown(f"""
-        <div style="text-align:center;
-            background:#ecfeff;
-            padding:25px;
-            border-radius:15px;">
-        <h2>⚡ Predicted Energy Consumption</h2>
-        <h1 style="color:#0f766e;">{prediction:.2f} kW</h1>
-        <p>User: <b>{name}</b> | Building: <b>{building}</b></p>
-        </div>
-        """, unsafe_allow_html=True)
+    ax.set_ylabel("Power (kW)")
+    st.pyplot(fig)
 
-        # =====================================================
-        # ADVICE SECTION
-        # =====================================================
-        st.markdown("### 📌 Smart Advice")
+# ===============================
+# ABOUT PAGE
+# ===============================
+elif menu == "ℹ️ About":
+    st.title("ℹ️ About This Project")
 
-        if prediction > avg * 1.3:
-            st.error("""
-            ⚠️ **Very High Energy Consumption**
-            
-            Possible causes:
-            - Many high-power appliances used at the same time
-            
-            Advice:
-            - Avoid using cooker, iron and washing machine together  
-            - Shift laundry to off-peak hours  
-            - Switch off unused devices
-            """)
-        elif prediction > avg:
-            st.warning("""
-            ⚠️ **Moderately High Consumption**
-            
-            Advice:
-            - Reduce kitchen appliance usage  
-            - Use energy-saving bulbs
-            """)
-        else:
-            st.success("""
-            ✅ **Energy Usage is Efficient**
-            
-            - You are using electricity wisely  
-            - Keep it up 💚
-            """)
+    st.markdown("""
+    **Course:** Machine Learning – Project Work (Test 2)  
 
-        # =====================================================
-        # VISUALIZATION
-        # =====================================================
-        st.markdown("### 📊 Energy Consumption Comparison")
+    **Project Title:**  
+    Development and Deployment of a Machine Learning–based AI Application  
 
-        graph_type = st.radio(
-            "Select Graph Type",
-            ["Bar Chart", "Line Chart"],
-            horizontal=True
-        )
+    **Models Used:**  
+    - Linear Regression  
+    - Decision Tree  
 
-        plot_df = pd.DataFrame({
-            "Level": ["Low", "Average", "Your Usage", "High"],
-            "Power (kW)": [
-                df_num[TARGET].min(),
-                avg,
-                prediction,
-                df_num[TARGET].max()
-            ]
-        })
+    **Deployment:**  
+    - Streamlit Cloud  
 
-        if graph_type == "Bar Chart":
-            fig = px.bar(
-                plot_df,
-                x="Level",
-                y="Power (kW)",
-                color="Level",
-                template="plotly_white"
-            )
-        else:
-            fig = px.line(
-                plot_df,
-                x="Level",
-                y="Power (kW)",
-                markers=True,
-                template="plotly_white"
-            )
-
-        st.plotly_chart(fig, use_container_width=True)
+    ⚡ This project demonstrates how Machine Learning can support smart electricity usage in real-world Tanzanian contexts.
+    """)
