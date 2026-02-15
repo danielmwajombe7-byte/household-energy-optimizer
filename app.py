@@ -4,36 +4,46 @@ import plotly.express as px
 from sklearn.tree import DecisionTreeRegressor
 import numpy as np
 
-# =====================================================
-# PAGE CONFIG
-# =====================================================
 st.set_page_config(
     page_title="Smart Energy Consumption",
     page_icon="⚡",
     layout="wide"
 )
 
-# =====================================================
-# SIDEBAR NAVIGATION
-# =====================================================
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["User Info", "Prediction", "Visualization"])
-
-# =====================================================
-# LOAD DATA
-# =====================================================
+# ==========================
+# Load dataset safely
+# ==========================
 @st.cache_data
 def load_data():
     try:
         df = pd.read_csv("tanzania_power_data.csv", sep=";", engine="python")
         if "Date" in df.columns and "Time" in df.columns:
-            df["Datetime"] = pd.to_datetime(df["Date"] + " " + df["Time"],
-                                            dayfirst=True, errors="coerce")
+            df["Datetime"] = pd.to_datetime(df["Date"] + " " + df["Time"], dayfirst=True, errors="coerce")
             df.drop(columns=["Date", "Time"], inplace=True)
         for col in df.columns:
             if col != "Datetime":
                 df[col] = pd.to_numeric(df[col], errors="coerce")
         df.dropna(inplace=True)
+
+        # Map your CSV columns to standard names
+        col_map = {}
+        if "Sub_metering_1" in df.columns:
+            col_map["Sub_metering_1"] = "Kitchen_Power"
+        if "Sub_metering_2" in df.columns:
+            col_map["Sub_metering_2"] = "Laundry_Power"
+        if "Global_reactive_power" in df.columns:
+            col_map["Global_reactive_power"] = "Extra_Loss"
+
+        df.rename(columns=col_map, inplace=True)
+
+        # Ensure required columns exist
+        for col in ["Kitchen_Power", "Laundry_Power", "Extra_Loss"]:
+            if col not in df.columns:
+                df[col] = 0.0  # fallback if missing
+
+        # Create target
+        df["Global_active_power"] = df["Kitchen_Power"] + df["Laundry_Power"] + df["Extra_Loss"]
+
     except Exception:
         # Fallback mini dataset
         df = pd.DataFrame({
@@ -43,17 +53,21 @@ def load_data():
             "Laundry_Power": [0.8, 1.0, 0.6, 0.9, 1.2, 0.5, 0.7, 1.1, 0.9, 0.6],
             "Extra_Loss": [0.3, 0.4, 0.2, 0.35, 0.5, 0.15, 0.25, 0.45, 0.3, 0.2]
         })
-    df["Global_active_power"] = df["Kitchen_Power"] + df["Laundry_Power"] + df["Extra_Loss"]
+        df["Global_active_power"] = df["Kitchen_Power"] + df["Laundry_Power"] + df["Extra_Loss"]
+
     return df
 
 df = load_data()
 
+# ==========================
+# Features / Target
+# ==========================
 FEATURES = ["Voltage", "Current", "Kitchen_Power", "Laundry_Power", "Extra_Loss"]
 TARGET = "Global_active_power"
 
-# =====================================================
-# TRAIN MODEL
-# =====================================================
+# ==========================
+# Train model
+# ==========================
 @st.cache_resource
 def train_model(df):
     X = df[FEATURES]
@@ -63,158 +77,3 @@ def train_model(df):
     return model
 
 model = train_model(df)
-
-# =====================================================
-# PAGE 1: USER INFORMATION
-# =====================================================
-if page == "User Info":
-    st.markdown("""
-    <div style="
-        background: linear-gradient(90deg,#0f2027,#203a43,#2c5364);
-        padding:30px;
-        border-radius:15px;
-        text-align:center;
-        margin-bottom:30px;
-    ">
-    <div style="font-size:55px;color:#facc15;">💡</div>
-    <h1 style="color:white;">Smart Energy Consumption AI App</h1>
-    <p style="color:#d1d5db;">Machine Learning Based Energy Prediction</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.subheader("👤 User Information")
-    name = st.text_input("Enter your name")
-    building = st.selectbox(
-        "Select Building Type",
-        ["House", "Office", "School", "Factory"]
-    )
-
-    if st.button("Save User Info"):
-        if name.strip() == "":
-            st.warning("Please enter your name")
-        else:
-            st.success(f"User info saved! Name: {name} | Building: {building}")
-            st.session_state["name"] = name
-            st.session_state["building"] = building
-
-# =====================================================
-# PAGE 2: INPUT & PREDICTION
-# =====================================================
-elif page == "Prediction":
-    st.subheader("⚡ Enter Values for Prediction")
-
-    col1, col2 = st.columns(2)
-    user_input = {}
-
-    with col1:
-        user_input["Extra_Loss"] = st.number_input(
-            "Extra Power Loss", value=float(df["Extra_Loss"].mean())
-        )
-        user_input["Voltage"] = st.number_input(
-            "Electric Voltage (V)", value=float(df["Voltage"].mean())
-        )
-        user_input["Kitchen_Power"] = st.number_input(
-            "Kitchen Power Usage", value=float(df["Kitchen_Power"].mean())
-        )
-
-    with col2:
-        user_input["Current"] = st.number_input(
-            "Current Intensity (A)", value=float(df["Current"].mean())
-        )
-        user_input["Laundry_Power"] = st.number_input(
-            "Laundry Power Usage", value=float(df["Laundry_Power"].mean())
-        )
-
-    if st.button("⚡ Predict Energy Consumption", use_container_width=True):
-        # Ensure session info exists
-        name = st.session_state.get("name", "Unknown User")
-        building = st.session_state.get("building", "Unknown Building")
-
-        # Prediction
-        input_df = pd.DataFrame([{f: user_input[f] for f in FEATURES}])
-        prediction = model.predict(input_df)[0]
-        avg = df[TARGET].mean()
-
-        st.markdown(f"""
-        <div style="text-align:center;
-            background:#ecfeff;
-            padding:25px;
-            border-radius:15px;">
-        <h2>⚡ Predicted Energy Consumption</h2>
-        <h1 style="color:#0f766e;">{prediction:.2f} kW</h1>
-        <p>User: <b>{name}</b> | Building: <b>{building}</b></p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Advice
-        st.markdown("### 📌 Smart Advice")
-        if prediction > avg * 1.3:
-            st.error("""
-            ⚠️ **Very High Energy Consumption**
-            
-            Possible causes:
-            - Many high-power appliances used at the same time
-            
-            Advice:
-            - Avoid using cooker, iron and washing machine together  
-            - Shift laundry to off-peak hours  
-            - Switch off unused devices
-            """)
-        elif prediction > avg:
-            st.warning("""
-            ⚠️ **Moderately High Consumption**
-            
-            Advice:
-            - Reduce kitchen appliance usage  
-            - Use energy-saving bulbs
-            """)
-        else:
-            st.success("""
-            ✅ **Energy Usage is Efficient**
-            
-            - You are using electricity wisely  
-            - Keep it up 💚
-            """)
-
-# =====================================================
-# PAGE 3: VISUALIZATION
-# =====================================================
-elif page == "Visualization":
-    st.subheader("📊 Energy Consumption Comparison")
-
-    # Retrieve prediction if exists
-    input_df = pd.DataFrame([{f: st.session_state.get(f, df[f].mean()) for f in FEATURES}])
-    prediction = model.predict(input_df)[0] if "name" in st.session_state else df[TARGET].mean()
-    avg = df[TARGET].mean()
-
-    # Select graph type
-    graph_type = st.selectbox("Select Graph Type", ["Bar Chart", "Line Chart"])
-
-    plot_df = pd.DataFrame({
-        "Level": ["Low", "Average", "Your Usage", "High"],
-        "Power (kW)": [
-            df[TARGET].min(),
-            avg,
-            prediction,
-            df[TARGET].max()
-        ]
-    })
-
-    if graph_type == "Bar Chart":
-        fig = px.bar(
-            plot_df,
-            x="Level",
-            y="Power (kW)",
-            color="Level",
-            template="plotly_white"
-        )
-    else:
-        fig = px.line(
-            plot_df,
-            x="Level",
-            y="Power (kW)",
-            markers=True,
-            template="plotly_white"
-        )
-
-    st.plotly_chart(fig, use_container_width=True)
