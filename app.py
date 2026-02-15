@@ -116,17 +116,4 @@ elif page == "Prediction":
     st.session_state.user_info["name"] = st.text_input("Enter your name", value=st.session_state.user_info["name"])
     st.session_state.user_info["building"] = st.selectbox(
         "Select Building Type",
-        ["House", "Office", "School", "Factory"],
-        index=0 if st.session_state.user_info["building"] is None else ["House","Office","School","Factory"].index(st.session_state.user_info["building"])
-    )
-
-    if not st.session_state.user_info["name"] or not st.session_state.user_info["building"]:
-        st.warning("Please enter your name and select building type to predict.")
-    else:
-        st.markdown("### ⚡ Energy Prediction Inputs")
-        col1, col2 = st.columns(2)
-        user_input = {}
-        with col1:
-            user_input["Extra_Loss"] = st.number_input("Extra Power Loss", value=float(df["Extra_Loss"].mean()))
-            user_input["Voltage"] = st.number_input("Electric Voltage (V)", value=float(df["Voltage"].mean()))
-            us
+        ["House",]()
