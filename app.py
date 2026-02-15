@@ -4,11 +4,10 @@ import plotly.express as px
 from sklearn.tree import DecisionTreeRegressor
 import numpy as np
 
-st.set_page_config(
-    page_title="Smart Energy Consumption",
-    page_icon="⚡",
-    layout="wide"
-)
+# ==========================
+# Page config
+# ==========================
+st.set_page_config(page_title="Smart Energy Consumption", page_icon="⚡", layout="wide")
 
 # ==========================
 # Load dataset safely
@@ -25,7 +24,7 @@ def load_data():
                 df[col] = pd.to_numeric(df[col], errors="coerce")
         df.dropna(inplace=True)
 
-        # Map your CSV columns to standard names
+        # Map CSV columns to our standard names
         col_map = {}
         if "Sub_metering_1" in df.columns:
             col_map["Sub_metering_1"] = "Kitchen_Power"
@@ -33,19 +32,23 @@ def load_data():
             col_map["Sub_metering_2"] = "Laundry_Power"
         if "Global_reactive_power" in df.columns:
             col_map["Global_reactive_power"] = "Extra_Loss"
+        if "Voltage" not in df.columns:
+            df["Voltage"] = 230  # default value
+        if "Global_intensity" in df.columns:
+            col_map["Global_intensity"] = "Current"
 
         df.rename(columns=col_map, inplace=True)
 
-        # Ensure required columns exist
-        for col in ["Kitchen_Power", "Laundry_Power", "Extra_Loss"]:
+        # Ensure all feature columns exist
+        for col in ["Voltage", "Current", "Kitchen_Power", "Laundry_Power", "Extra_Loss"]:
             if col not in df.columns:
-                df[col] = 0.0  # fallback if missing
+                df[col] = 0.0
 
-        # Create target
+        # Target
         df["Global_active_power"] = df["Kitchen_Power"] + df["Laundry_Power"] + df["Extra_Loss"]
 
     except Exception:
-        # Fallback mini dataset
+        # fallback mini dataset
         df = pd.DataFrame({
             "Voltage": [220, 230, 210, 225, 240, 200, 215, 235, 220, 210],
             "Current": [5, 6, 4.5, 5.5, 6.5, 4, 4.8, 6, 5.2, 4.6],
@@ -60,10 +63,15 @@ def load_data():
 df = load_data()
 
 # ==========================
-# Features / Target
+# Features / target
 # ==========================
 FEATURES = ["Voltage", "Current", "Kitchen_Power", "Laundry_Power", "Extra_Loss"]
 TARGET = "Global_active_power"
+
+# Make sure all features exist
+for col in FEATURES:
+    if col not in df.columns:
+        df[col] = 0.0
 
 # ==========================
 # Train model
@@ -77,3 +85,5 @@ def train_model(df):
     return model
 
 model = train_model(df)
+
+st.success("✅ Dataset loaded and model trained successfully!")
