@@ -10,18 +10,17 @@ import numpy as np
 st.set_page_config(page_title="Smart Energy Consumption", page_icon="⚡", layout="wide")
 
 # ==========================
-# LOAD DATA (with proper mapping)
+# LOAD DATA
 # ==========================
 @st.cache_data
 def load_data():
     try:
         df = pd.read_csv("tanzania_power_data.csv", sep=";", engine="python")
-        # Convert Date & Time if exist
         if "Date" in df.columns and "Time" in df.columns:
             df["Datetime"] = pd.to_datetime(df["Date"] + " " + df["Time"], dayfirst=True, errors="coerce")
             df.drop(columns=["Date", "Time"], inplace=True)
 
-        # Map original dataset columns to standard feature names
+        # Map columns to standard names
         col_map = {}
         if "Sub_metering_1" in df.columns: col_map["Sub_metering_1"] = "Kitchen_Power"
         if "Sub_metering_2" in df.columns: col_map["Sub_metering_2"] = "Laundry_Power"
@@ -29,12 +28,11 @@ def load_data():
         if "Global_intensity" in df.columns: col_map["Global_intensity"] = "Current"
         df.rename(columns=col_map, inplace=True)
 
-        # Ensure all features exist in dataset
+        # Ensure feature columns exist
         for col in ["Voltage", "Current", "Kitchen_Power", "Laundry_Power", "Extra_Loss"]:
             if col not in df.columns:
-                df[col] = df[col].mean() if col in df.columns else 0.0
+                df[col] = 0.0
 
-        # Convert all to numeric
         for col in ["Voltage", "Current", "Kitchen_Power", "Laundry_Power", "Extra_Loss"]:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -42,7 +40,7 @@ def load_data():
         df["Global_active_power"] = df["Kitchen_Power"] + df["Laundry_Power"] + df["Extra_Loss"]
 
     except Exception:
-        # fallback mini dataset
+        # Fallback dataset
         df = pd.DataFrame({
             "Voltage": [220,230,210,225,240,200,215,235,220,210],
             "Current": [5,6,4.5,5.5,6.5,4,4.8,6,5.2,4.6],
@@ -55,11 +53,8 @@ def load_data():
     return df
 
 df = load_data()
-
 FEATURES = ["Voltage", "Current", "Kitchen_Power", "Laundry_Power", "Extra_Loss"]
 TARGET = "Global_active_power"
-AVG_POWER = df[TARGET].mean()
-HIGH_THRESHOLD = AVG_POWER * 1.3  # Very High Consumption
 
 # ==========================
 # TRAIN MODEL
@@ -78,7 +73,7 @@ model = train_model(df)
 # SIDEBAR MENU
 # ==========================
 st.sidebar.title("📂 Menu")
-page = st.sidebar.radio("Chagua Page", ["Home", "Prediction", "Visualization"])
+page = st.sidebar.radio("Go to", ["Home", "Prediction", "Visualization"])
 
 # ==========================
 # SESSION STATE
@@ -97,6 +92,4 @@ if page == "Home":
                 padding:30px; border-radius:15px; text-align:center;">
         <div style="font-size:55px;color:#facc15;">💡</div>
         <h1 style="color:white;">Smart Energy Consumption AI App</h1>
-        <p style="color:#d1d5db;">Machine Learning Based Energy Prediction</p>
-    </div>
-    """, unsaf
+        <p style="color:#d1d5db;">Machine
