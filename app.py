@@ -67,7 +67,7 @@ elif page == "Prediction":
         st.session_state.user_input["Extra_Loss"] = st.number_input(
             "Extra Power Loss (Wiring & Leakage)",
             min_value=0.0,
-            value=10.0
+            value=2.0
         )
 
         st.session_state.user_input["Voltage"] = st.number_input(
@@ -92,18 +92,20 @@ elif page == "Prediction":
         st.session_state.user_input["Laundry_Power"] = st.number_input(
             "Laundry Power Usage (Washing Machine)",
             min_value=0.0,
-            value=8.0
+            value=6.0
         )
 
     # ===============================
-    # PREDICT BUTTON (ONE ONLY)
+    # PREDICT BUTTON
     # ===============================
     if st.button("🚀 Predict Energy Consumption", use_container_width=True):
         input_df = pd.DataFrame([st.session_state.user_input])
         prediction = model.predict(input_df)[0]
         st.session_state.prediction = prediction
 
-        st.success(f"✅ Predicted Laundry Power Usage: **{prediction:.2f} kW**")
+        st.success(
+            f"✅ Predicted Laundry Power Usage: **{prediction:.2f} kW**"
+        )
 
 # ===============================
 # VISUALIZATION PAGE
@@ -117,7 +119,21 @@ elif page == "Visualization":
         ui = st.session_state.user_input
 
         # ===============================
-        # BAR CHART
+        # SAFE VALUE EXTRACTION
+        # ===============================
+        kitchen = ui.get("Kitchen_Power", 0)
+        laundry = ui.get("Laundry_Power", 0)
+        total = ui.get("Total_Power", 0)
+        extra = ui.get("Extra_Loss", 0)
+
+        # Hakikisha hakuna negative power
+        other_appliances = max(
+            total - (kitchen + laundry),
+            0
+        )
+
+        # ===============================
+        # BAR CHART DATA
         # ===============================
         plot_df = pd.DataFrame({
             "Category": [
@@ -127,13 +143,16 @@ elif page == "Visualization":
                 "Extra Loss"
             ],
             "Power (kW)": [
-                ui["Kitchen_Power"],
-                ui["Laundry_Power"],
-                ui["Total_Power"] - (ui["Kitchen_Power"] + ui["Laundry_Power"]),
-                ui["Extra_Loss"]
+                kitchen,
+                laundry,
+                other_appliances,
+                extra
             ]
         })
 
+        # ===============================
+        # DRAW GRAPH
+        # ===============================
         fig, ax = plt.subplots()
         ax.bar(plot_df["Category"], plot_df["Power (kW)"])
         ax.set_ylabel("Power (kW)")
