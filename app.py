@@ -25,19 +25,30 @@ df = load_data()
 # FEATURES & TARGET
 # ===============================
 FEATURES = [
+    "Kitchen_Power",
+    "Laundry_Power",
+    "Other_Power",
     "Extra_Loss",
     "Voltage",
-    "Current",
-    "Kitchen_Power",
-    "Laundry_Power"
+    "Current"
 ]
 
 TARGET = "Total_Power"
 
-# Hakikisha columns zipo
-for col in FEATURES + [TARGET]:
+# ===============================
+# ENSURE COLUMNS EXIST
+# ===============================
+for col in FEATURES:
     if col not in df.columns:
         df[col] = 0.0
+
+# Calculate TOTAL POWER correctly
+df["Total_Power"] = (
+    df["Kitchen_Power"]
+    + df["Laundry_Power"]
+    + df["Other_Power"]
+    + df["Extra_Loss"]
+)
 
 # ===============================
 # TRAIN MODEL
@@ -48,7 +59,7 @@ def train_model(df):
     y = df[TARGET]
 
     model = DecisionTreeRegressor(
-        max_depth=5,
+        max_depth=6,
         random_state=42
     )
     model.fit(X, y)
@@ -59,9 +70,6 @@ model = train_model(df)
 # ===============================
 # SESSION STATE
 # ===============================
-if "user_input" not in st.session_state:
-    st.session_state.user_input = {}
-
 if "prediction" not in st.session_state:
     st.session_state.prediction = None
 
@@ -74,108 +82,70 @@ page = st.sidebar.radio(
 )
 
 # ===============================
-# DASHBOARD PAGE
+# DASHBOARD
 # ===============================
 if page == "Dashboard":
     st.title("⚡ Smart Energy Consumption Dashboard")
-    st.write("Predict • Visualize • Understand Your Power Usage")
 
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric("📄 Records", df.shape[0])
-    col2.metric("📊 Features", len(FEATURES))
-    col3.metric("🎯 Target", "Total Energy Used")
-    col4.metric("📉 Model", "Decision Tree")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("📄 Records", len(df))
+    c2.metric("📊 Features", len(FEATURES))
+    c3.metric("🎯 Target", "Total Energy Used")
+    c4.metric("🤖 Model", "Decision Tree")
 
 # ===============================
 # PREDICTION PAGE
 # ===============================
 elif page == "Prediction":
-    st.header("🧮 Enter Values for Prediction")
+    st.header("🧮 Enter Household Energy Usage")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.session_state.user_input["Extra_Loss"] = st.number_input(
-            "Extra Power Loss (kW)",
-            min_value=0.0,
-            value=2.0
-        )
-
-        st.session_state.user_input["Voltage"] = st.number_input(
-            "Electric Voltage (V)",
-            min_value=0.0,
-            value=220.0
-        )
-
-        st.session_state.user_input["Kitchen_Power"] = st.number_input(
-            "Kitchen Power Usage (kW)",
-            min_value=0.0,
-            value=8.0
+        kitchen = st.number_input("🍳 Kitchen Power (kW)", 0.0, value=4.5)
+        laundry = st.number_input("🧺 Laundry Power (kW)", 0.0, value=6.0)
+        other = st.number_input(
+            "💡 Other Uses (TV, Bulbs, Phone Charging) (kW)",
+            0.0,
+            value=3.0
         )
 
     with col2:
-        st.session_state.user_input["Current"] = st.number_input(
-            "Current Intensity (A)",
-            min_value=0.0,
-            value=4.5
-        )
+        extra = st.number_input("⚠️ Extra Power Loss (kW)", 0.0, value=2.0)
+        voltage = st.number_input("🔌 Voltage (V)", 0.0, value=220.0)
+        current = st.number_input("⚡ Current (A)", 0.0, value=4.5)
 
-        st.session_state.user_input["Laundry_Power"] = st.number_input(
-            "Laundry Power Usage (kW)",
-            min_value=0.0,
-            value=6.0
-        )
-
-    # ===============================
-    # PREDICT BUTTON (FIXED)
-    # ===============================
     if st.button("🚀 Predict Total Energy Used", use_container_width=True):
+        input_df = pd.DataFrame([{
+            "Kitchen_Power": kitchen,
+            "Laundry_Power": laundry,
+            "Other_Power": other,
+            "Extra_Loss": extra,
+            "Voltage": voltage,
+            "Current": current
+        }])
 
-        # FORCE SAME FEATURE ORDER AS TRAINING
-        input_df = pd.DataFrame(
-            [[st.session_state.user_input.get(f, 0) for f in FEATURES]],
-            columns=FEATURES
-        )
-
-        pred = model.predict(input_df)[0]
-        st.session_state.prediction = pred
+        prediction = model.predict(input_df)[0]
+        st.session_state.prediction = prediction
 
         st.success(
-            f"✅ Predicted Total Energy Used: **{pred:.2f} kW**"
+            f"✅ Predicted Total Energy Used: **{prediction:.2f} kW**"
         )
 
 # ===============================
-# VISUALIZATION PAGE
+# VISUALIZATION
 # ===============================
 elif page == "Visualization":
-    st.header("📊 Energy Usage Visualization")
+    st.header("📊 Power Usage Breakdown")
 
-    if not st.session_state.user_input:
-        st.warning("⚠️ Ingiza data kwanza kwenye Prediction page.")
+    if st.session_state.prediction is None:
+        st.warning("⚠️ Fanya prediction kwanza.")
     else:
-        ui = st.session_state.user_input
-
-        kitchen = ui.get("Kitchen_Power", 0)
-        laundry = ui.get("Laundry_Power", 0)
-        extra = ui.get("Extra_Loss", 0)
-
-        predicted_total = (
-            st.session_state.prediction
-            if st.session_state.prediction
-            else kitchen + laundry + extra
-        )
-
-        other = max(
-            predicted_total - (kitchen + laundry + extra),
-            0
-        )
-
         plot_df = pd.DataFrame({
             "Category": [
                 "Kitchen",
                 "Laundry",
-                "Other Appliances",
+                "Other Uses",
                 "Extra Loss"
             ],
             "Power (kW)": [
@@ -187,17 +157,12 @@ elif page == "Visualization":
         })
 
         fig, ax = plt.subplots()
-        ax.bar(
-            plot_df["Category"],
-            plot_df["Power (kW)"]
-        )
-        ax.set_title("Household Power Distribution")
+        ax.bar(plot_df["Category"], plot_df["Power (kW)"])
         ax.set_ylabel("Power (kW)")
+        ax.set_title("Household Energy Distribution")
 
         st.pyplot(fig)
 
-        if st.session_state.prediction is not None:
-            st.info(
-                f"🔮 Predicted Total Energy Used: "
-                f"**{st.session_state.prediction:.2f} kW**"
-            )
+        st.info(
+            f"🔮 Total Energy Used: **{st.session_state.prediction:.2f} kW**"
+        )
