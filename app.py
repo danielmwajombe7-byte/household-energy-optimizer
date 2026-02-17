@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 from sklearn.tree import DecisionTreeRegressor
 
 # ===============================
@@ -40,7 +39,7 @@ APP_FEATURES = {
 
 TARGET = "Total_Power"
 
-# Ensure columns exist in df
+# Ensure columns exist
 all_features = set(sum(APP_FEATURES.values(), []))
 for col in all_features.union({TARGET}):
     if col not in df.columns:
@@ -67,7 +66,7 @@ defaults = {
     "duration": 1.0,
     "feature_values": {},
     "user_name": "",
-    "application_type": "Household"
+    "application_type": ""
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -87,27 +86,31 @@ page = st.sidebar.radio(
 if page == "Dashboard":
     st.markdown("""
     <div style="background:linear-gradient(90deg,#0f2027,#203a43,#2c5364);
-    padding:25px;border-radius:15px;color:white;text-align:center;">
-        <div style="font-size:55px;">💡</div>
-        <h1>Smart Energy Consumption Dashboard</h1>
+    padding:20px;border-radius:15px;color:white;text-align:center;">
+        <div style="font-size:45px;">💡</div>
+        <h2>Smart Energy Dashboard</h2>
         <p>Predict • Measure • Understand Electricity Usage</p>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # User input
-    st.subheader("👤 User Info & Application")
+    # User info input (mandatory for prediction)
+    st.subheader("👤 Enter your info to access Prediction")
     col1, col2 = st.columns(2)
     with col1:
-        user_name = st.text_input("Enter your name", st.session_state.user_name)
+        user_name = st.text_input("Name", st.session_state.user_name)
         st.session_state.user_name = user_name
     with col2:
-        application_type = st.selectbox("Select Application Type", list(APP_FEATURES.keys()), index=list(APP_FEATURES.keys()).index(st.session_state.application_type))
+        application_type = st.selectbox(
+            "Application Type", 
+            list(APP_FEATURES.keys()), 
+            index=list(APP_FEATURES.keys()).index(st.session_state.application_type) if st.session_state.application_type in APP_FEATURES else 0
+        )
         st.session_state.application_type = application_type
 
-    # Optional dashboard summary
-    if st.checkbox("Show Dashboard Summary", value=True):
+    # Optional dashboard summary (hidden by default)
+    if st.checkbox("Show Dashboard Summary", value=False):
         st.subheader("📊 Dashboard Summary")
         feature_example = {feat.replace("_Power","").replace("_"," "): 5 for feat in APP_FEATURES[application_type]}
         col1, col2, col3 = st.columns(3)
@@ -115,28 +118,25 @@ if page == "Dashboard":
         col2.metric("📊 Features", len(APP_FEATURES[application_type]))
         col3.metric("🎯 Target", "Energy (kWh)")
 
-        fig, ax = plt.subplots(figsize=(6,2))
-        ax.barh(list(feature_example.keys()), list(feature_example.values()), color="#60a5fa")
-        ax.set_xlabel("Power (kW)")
-        st.pyplot(fig)
-
 # ===============================
 # PREDICTION PAGE
 # ===============================
 elif page == "Prediction":
-    st.header("🧮 Energy Prediction Input & Predict Energy Used")
+    # User must provide name & application type
+    if st.session_state.user_name.strip() == "" or st.session_state.application_type.strip() == "":
+        st.warning("⚠️ Verbal Warning: Enter your name and select application type to predict energy.")
+        st.stop()  # Stop execution until info is provided
 
-    # User info & application type input
-    col1, col2 = st.columns(2)
-    with col1:
-        user_name = st.text_input("Enter your name", st.session_state.user_name)
-        st.session_state.user_name = user_name
-    with col2:
-        application_type = st.selectbox("Select Application Type", list(APP_FEATURES.keys()), index=list(APP_FEATURES.keys()).index(st.session_state.application_type))
-        st.session_state.application_type = application_type
+    st.markdown(f"""
+    <div style="background:linear-gradient(90deg,#1e3c72,#2a5298);
+    padding:15px;border-radius:12px;color:white;text-align:center;">
+        <h3>🧮 Predict Energy Usage - {st.session_state.application_type}</h3>
+        <p>Hello {st.session_state.user_name}, input feature values below</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # Features input
-    features = APP_FEATURES[application_type]
+    # Ready-to-input prediction form
+    features = APP_FEATURES[st.session_state.application_type]
     feature_values = {}
     col1, col2 = st.columns(2)
     for i, feat in enumerate(features):
@@ -147,44 +147,35 @@ elif page == "Prediction":
             feature_values[feat] = col2.number_input(f"{label} Power (kW)", 0.0, value=5.0)
 
     st.markdown("---")
-
-    duration = st.slider("⏱️ Duration of Usage (Hours)", min_value=0.5, max_value=24.0, value=5.0, step=0.5)
+    duration = st.slider("⏱️ Duration (Hours)", min_value=0.5, max_value=24.0, value=5.0, step=0.5)
 
     if st.button("🖱️ Predict Energy Used", use_container_width=True):
         st.session_state.feature_values = feature_values
         st.session_state.duration = duration
 
-        # Total units per feature
+        # Calculate total units per feature
         feature_energy = {feat.replace("_Power","").replace("_"," "): val*duration for feat,val in feature_values.items()}
         total_units = sum(feature_energy.values())
         total_cost = total_units * PRICE_PER_UNIT
 
-        # Advice based on features consuming >30%
+        # Advice based on high consumption (>30%)
         advice_list = []
         for feat, energy in feature_energy.items():
             if (energy/total_units)*100 > 30:
                 advice_list.append(f"⚠️ {feat} consumes a lot! Consider efficient use.")
 
         if not advice_list:
-            advice_list.append("✅ Your energy usage is balanced across features.")
+            advice_list.append("✅ Energy usage is balanced across features.")
 
         final_advice = "\n".join(advice_list)
         st.session_state.prediction = total_units
 
-        # Display mini bar chart for contribution
-        fig, ax = plt.subplots(figsize=(6,3))
-        ax.bar(feature_energy.keys(), feature_energy.values(), color="#facc15")
-        ax.set_title("Feature Contribution to Total Energy Used")
-        ax.set_ylabel("Energy Used (kWh)")
-        st.pyplot(fig)
-
-        # Display results
-        st.success(f"⚡ Energy Prediction Summary for {user_name}")
+        st.success("⚡ Energy Prediction Summary")
         st.markdown(
             f"""
 ### 🔌 Units & Duration
 - **Total Units Used:** `{total_units:.2f}`  
-- **Duration of Usage:** `{duration} hours`  
+- **Duration:** `{duration} hours`  
 
 ---
 
@@ -193,7 +184,7 @@ elif page == "Prediction":
 
 ---
 
-### 🧠 Advice Based on High Consumption Features
+### 🧠 Advice
 {final_advice}
 """
         )
