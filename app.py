@@ -54,24 +54,22 @@ model = train_model(df)
 # ===============================
 # SESSION STATE INIT
 # ===============================
-if "user_name" not in st.session_state:
-    st.session_state.user_name = ""
-if "application_type" not in st.session_state:
-    st.session_state.application_type = "Select"
-if "prediction" not in st.session_state:
-    st.session_state.prediction = None
-if "duration" not in st.session_state:
-    st.session_state.duration = 1.0
-if "kitchen" not in st.session_state:
-    st.session_state.kitchen = 0.0
-if "laundry" not in st.session_state:
-    st.session_state.laundry = 0.0
-if "other" not in st.session_state:
-    st.session_state.other = 0.0
-if "extra" not in st.session_state:
-    st.session_state.extra = 0.0
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False  # controls login -> prediction
+session_defaults = {
+    "user_name": "",
+    "application_type": "Select",
+    "authenticated": False,
+    "prediction": None,
+    "duration": 1.0,
+    "kitchen": 0.0,
+    "laundry": 0.0,
+    "other": 0.0,
+    "extra": 0.0,
+    "show_prediction_form": False
+}
+
+for k, v in session_defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
 # ===============================
 # LOGIN PAGE
@@ -96,15 +94,16 @@ if not st.session_state.authenticated:
             if user_name.strip() == "" or application_type == "Select":
                 st.warning("⚠️ Verbal Warning. Please enter your Name and select Application Type.")
             else:
+                # Save user info and show prediction form
                 st.session_state.user_name = user_name
                 st.session_state.application_type = application_type
                 st.session_state.authenticated = True
-                st.experimental_rerun()  # immediately go to Prediction page
+                st.session_state.show_prediction_form = True
 
 # ===============================
-# PREDICTION PAGE (MAIN)
+# PREDICTION PAGE
 # ===============================
-if st.session_state.authenticated:
+if st.session_state.authenticated and st.session_state.show_prediction_form:
     st.header("🧮 Predict Energy Usage")
     st.write(f"User: **{st.session_state.user_name}** | Application: **{st.session_state.application_type}**")
     
@@ -179,30 +178,29 @@ if st.session_state.authenticated:
 # ===============================
 # VISUALIZATION PAGE
 # ===============================
-if st.session_state.authenticated:
+if st.session_state.authenticated and st.session_state.prediction is not None:
     st.subheader("📊 Energy Usage Visualization")
-    if st.session_state.prediction is not None:
-        plot_df = pd.DataFrame({
-            "Category": ["Kitchen", "Laundry", "Other Use", "Extra Loss"],
-            "Power (kW)": [
-                st.session_state.kitchen,
-                st.session_state.laundry,
-                st.session_state.other,
-                st.session_state.extra
-            ]
-        })
+    plot_df = pd.DataFrame({
+        "Category": ["Kitchen", "Laundry", "Other Use", "Extra Loss"],
+        "Power (kW)": [
+            st.session_state.kitchen,
+            st.session_state.laundry,
+            st.session_state.other,
+            st.session_state.extra
+        ]
+    })
 
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.bar(plot_df["Category"], plot_df["Power (kW)"], color="#38bdf8")
-        ax.set_title(f"{st.session_state.application_type} Power Distribution")
-        ax.set_ylabel("Power (kWh)")
-        st.pyplot(fig)
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.bar(plot_df["Category"], plot_df["Power (kW)"], color="#38bdf8")
+    ax.set_title(f"{st.session_state.application_type} Power Distribution")
+    ax.set_ylabel("Power (kWh)")
+    st.pyplot(fig)
 
-        total_cost = st.session_state.prediction * PRICE_PER_UNIT
-        st.info(
-            f"""
+    total_cost = st.session_state.prediction * PRICE_PER_UNIT
+    st.info(
+        f"""
 🔋 **Total Units Used:** {st.session_state.prediction:.2f} units  
 ⏱️ **Duration:** {st.session_state.duration} hours  
 💰 **Total Cost:** {total_cost:,.0f} TZS
 """
-        )
+    )
