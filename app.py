@@ -14,7 +14,7 @@ st.set_page_config(
 # ===============================
 # ELECTRICITY PRICE (TZS per kWh)
 # ===============================
-PRICE_PER_UNIT = 350  # 1 unit = 1 kWh
+PRICE_PER_UNIT = 350
 
 # ===============================
 # LOAD DATA
@@ -106,25 +106,37 @@ if page == "Dashboard":
         application_type = st.selectbox("Select Application Type", list(APP_FEATURES.keys()), index=list(APP_FEATURES.keys()).index(st.session_state.application_type))
         st.session_state.application_type = application_type
 
-    # Metrics with mini chart
-    st.subheader("📊 Dashboard Summary")
-    feature_example = {feat.replace("_Power","").replace("_"," "): 5 for feat in APP_FEATURES[application_type]}
-    col1, col2, col3 = st.columns(3)
-    col1.metric("📄 Records", df.shape[0])
-    col2.metric("📊 Features", len(APP_FEATURES[application_type]))
-    col3.metric("🎯 Target", "Energy (kWh)")
+    # Optional dashboard summary
+    if st.checkbox("Show Dashboard Summary", value=True):
+        st.subheader("📊 Dashboard Summary")
+        feature_example = {feat.replace("_Power","").replace("_"," "): 5 for feat in APP_FEATURES[application_type]}
+        col1, col2, col3 = st.columns(3)
+        col1.metric("📄 Records", df.shape[0])
+        col2.metric("📊 Features", len(APP_FEATURES[application_type]))
+        col3.metric("🎯 Target", "Energy (kWh)")
 
-    fig, ax = plt.subplots(figsize=(6,2))
-    ax.barh(list(feature_example.keys()), list(feature_example.values()), color="#60a5fa")
-    ax.set_xlabel("Power (kWh)")
-    st.pyplot(fig)
+        fig, ax = plt.subplots(figsize=(6,2))
+        ax.barh(list(feature_example.keys()), list(feature_example.values()), color="#60a5fa")
+        ax.set_xlabel("Power (kW)")
+        st.pyplot(fig)
 
 # ===============================
 # PREDICTION PAGE
 # ===============================
 elif page == "Prediction":
-    st.header("🧮 Energy Prediction Input")
-    features = APP_FEATURES[st.session_state.application_type]
+    st.header("🧮 Energy Prediction Input & Predict Energy Used")
+
+    # User info & application type input
+    col1, col2 = st.columns(2)
+    with col1:
+        user_name = st.text_input("Enter your name", st.session_state.user_name)
+        st.session_state.user_name = user_name
+    with col2:
+        application_type = st.selectbox("Select Application Type", list(APP_FEATURES.keys()), index=list(APP_FEATURES.keys()).index(st.session_state.application_type))
+        st.session_state.application_type = application_type
+
+    # Features input
+    features = APP_FEATURES[application_type]
     feature_values = {}
     col1, col2 = st.columns(2)
     for i, feat in enumerate(features):
@@ -135,9 +147,10 @@ elif page == "Prediction":
             feature_values[feat] = col2.number_input(f"{label} Power (kW)", 0.0, value=5.0)
 
     st.markdown("---")
+
     duration = st.slider("⏱️ Duration of Usage (Hours)", min_value=0.5, max_value=24.0, value=5.0, step=0.5)
 
-    if st.button("🚀 Calculate Energy Consumption", use_container_width=True):
+    if st.button("🖱️ Predict Energy Used", use_container_width=True):
         st.session_state.feature_values = feature_values
         st.session_state.duration = duration
 
@@ -158,12 +171,19 @@ elif page == "Prediction":
         final_advice = "\n".join(advice_list)
         st.session_state.prediction = total_units
 
+        # Display mini bar chart for contribution
+        fig, ax = plt.subplots(figsize=(6,3))
+        ax.bar(feature_energy.keys(), feature_energy.values(), color="#facc15")
+        ax.set_title("Feature Contribution to Total Energy Used")
+        ax.set_ylabel("Energy Used (kWh)")
+        st.pyplot(fig)
+
         # Display results
-        st.success(f"⚡ Electricity Usage Summary for {st.session_state.user_name}")
+        st.success(f"⚡ Energy Prediction Summary for {user_name}")
         st.markdown(
             f"""
 ### 🔌 Units & Duration
-- **Total Units Used:** `{total_units:.2f} units` (1 unit = 1 kWh)  
+- **Total Units Used:** `{total_units:.2f}`  
 - **Duration of Usage:** `{duration} hours`  
 
 ---
@@ -185,7 +205,7 @@ elif page == "Visualization":
     st.header("📊 Energy Usage Visualization")
 
     if st.session_state.prediction is None:
-        st.warning("⚠️ Please calculate energy first from the Prediction page.")
+        st.warning("⚠️ Please predict energy first from the Prediction page.")
     else:
         feature_values = st.session_state.feature_values
         fig, ax = plt.subplots(figsize=(8,5))
@@ -197,7 +217,7 @@ elif page == "Visualization":
         total_cost = st.session_state.prediction * PRICE_PER_UNIT
         st.info(
             f"""
-🔋 **Total Units Used:** {st.session_state.prediction:.2f} units (1 unit = 1 kWh)  
+🔋 **Total Units Used:** {st.session_state.prediction:.2f}  
 ⏱️ **Duration:** {st.session_state.duration} hours  
 💰 **Total Cost:** {total_cost:,.0f} TZS
 """
