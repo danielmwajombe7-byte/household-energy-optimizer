@@ -24,7 +24,6 @@ def load_data():
     try:
         return pd.read_csv("tanzania_power_data.csv")
     except FileNotFoundError:
-        # Return empty dataframe if file not found
         return pd.DataFrame()
 
 df = load_data()
@@ -188,9 +187,30 @@ elif page == "Visualization":
     if st.session_state.prediction is None:
         st.warning("⚠️ Please calculate energy first from the Prediction page.")
     else:
+        # Prepare data for plot
         plot_df = pd.DataFrame({
             "Category": ["Kitchen", "Laundry", "Other Use", "Extra Loss"],
             "Power (kW)": [
                 st.session_state.kitchen,
                 st.session_state.laundry,
-                st.ses
+                st.session_state.other,
+                st.session_state.extra
+            ]
+        })
+
+        # Plot bar chart
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.bar(plot_df["Category"], plot_df["Power (kW)"], color="#38bdf8")
+        ax.set_title("Household Power Distribution")
+        ax.set_ylabel("Power (kW)")
+        st.pyplot(fig)
+
+        # Show estimated cost
+        estimated_cost = st.session_state.prediction * PRICE_PER_UNIT
+        st.info(
+            f"""
+🔋 **Total Energy Used:** {st.session_state.prediction:.2f} kWh  
+⏱️ **Duration:** {st.session_state.duration} hours  
+💰 **Estimated Cost:** {estimated_cost:,.0f} TZS  
+"""
+        )
