@@ -100,10 +100,43 @@ if page == "Dashboard":
     st.markdown("<br>", unsafe_allow_html=True)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("📄 Records", df.shape[0])
-    c2.metric("📊 Features", len(FEATURES))
-    c3.metric("🎯 Target", "Energy (kWh)")
-    c4.metric("🤖 Model", "Decision Tree")
+
+    c1.markdown(f"""
+    <div style="background:#4ade80;padding:20px;border-radius:10px;text-align:center;color:white;">
+    <h3>📄 Records</h3>
+    <p style="font-size:25px;">{df.shape[0]}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    c2.markdown(f"""
+    <div style="background:#60a5fa;padding:20px;border-radius:10px;text-align:center;color:white;">
+    <h3>📊 Features</h3>
+    <p style="font-size:25px;">{len(FEATURES)}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    c3.markdown(f"""
+    <div style="background:#facc15;padding:20px;border-radius:10px;text-align:center;color:white;">
+    <h3>🎯 Target</h3>
+    <p style="font-size:25px;">Energy (kWh)</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    c4.markdown(f"""
+    <div style="background:#f472b6;padding:20px;border-radius:10px;text-align:center;color:white;">
+    <h3>🤖 Model</h3>
+    <p style="font-size:25px;">Decision Tree</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Optional: Mini bar chart for feature demo
+    st.subheader("Feature Power Example (kW)")
+    demo_features = [4.5, 6.0, 3.0, 2.0]
+    demo_names = ["Kitchen", "Laundry", "Other", "Extra Loss"]
+    fig, ax = plt.subplots(figsize=(6,2))
+    ax.barh(demo_names, demo_features, color="#60a5fa")
+    ax.set_xlabel("Power (kW)")
+    st.pyplot(fig)
 
 # ===============================
 # PREDICTION PAGE
@@ -141,45 +174,33 @@ elif page == "Prediction":
         st.session_state.duration = duration
 
         # Total power and units
-        total_power = kitchen + laundry + other + extra
-        total_units = total_power * duration  # kWh
-        total_cost = total_units * PRICE_PER_UNIT  # TZS
+        feature_energy = {
+            "Kitchen": kitchen * duration,
+            "Laundry": laundry * duration,
+            "Other Use": other * duration,
+            "Extra Loss": extra * duration
+        }
+        total_units = sum(feature_energy.values())
+        total_cost = total_units * PRICE_PER_UNIT
 
-        # Strong actionable advice
-        if total_units <= 5:
-            advice = (
-                "✅ Excellent! Your energy usage is very efficient.\n"
-                "- Keep using energy-saving appliances.\n"
-                "- Switch off devices when not in use."
-            )
-        elif total_units <= 15:
-            advice = (
-                "🙂 Moderate usage detected.\n"
-                "- Turn off devices when idle.\n"
-                "- Avoid using multiple high-power appliances at the same time."
-            )
-        elif total_units <= 30:
-            advice = (
-                "⚠️ High usage detected.\n"
-                "- Replace older appliances with energy-efficient ones.\n"
-                "- Reduce simultaneous use of high-power devices."
-            )
-        elif total_units <= 60:
-            advice = (
-                "🚨 Very high consumption!\n"
-                "- Likely high electricity bill.\n"
-                "- Use LED lighting and energy-saving appliances.\n"
-                "- Reduce usage during peak hours."
-            )
-        else:
-            advice = (
-                "🔥 Extreme consumption!\n"
-                "- Immediate action required!\n"
-                "- Unplug unused devices.\n"
-                "- Limit simultaneous use of heavy-power appliances.\n"
-                "- Check for electrical leaks or losses."
-            )
+        # Identify features with high consumption (>30% of total)
+        advice_list = []
+        for feat, energy in feature_energy.items():
+            contribution = (energy / total_units) * 100
+            if contribution > 30:
+                if feat == "Kitchen":
+                    advice_list.append("⚠️ Kitchen consumes a lot! Cook efficiently, batch cooking, use lids.")
+                elif feat == "Laundry":
+                    advice_list.append("⚠️ Laundry consumes a lot! Wash full loads, avoid peak hours.")
+                elif feat == "Other Use":
+                    advice_list.append("⚠️ Other usage is high! Turn off devices when idle.")
+                elif feat == "Extra Loss":
+                    advice_list.append("⚠️ Extra losses are high! Check wiring and appliances.")
 
+        if not advice_list:
+            advice_list.append("✅ Your energy usage is balanced across appliances.")
+
+        final_advice = "\n".join(advice_list)
         st.session_state.prediction = total_units
 
         # Display results
@@ -187,7 +208,6 @@ elif page == "Prediction":
         st.markdown(
             f"""
 ### 🔌 Units & Duration
-
 - **Total Units Used:** `{total_units:.2f} units (kWh)`  
 - **Duration of Usage:** `{duration} hours`  
 
@@ -198,8 +218,8 @@ elif page == "Prediction":
 
 ---
 
-### 🧠 Strong Advice
-{advice}
+### 🧠 Advice Based on High Consumption Features
+{final_advice}
 """
         )
 
