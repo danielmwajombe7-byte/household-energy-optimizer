@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -142,29 +143,28 @@ elif page == "Prediction":
 
         # Calculate total power and energy
         total_power = kitchen + laundry + other + extra
-        energy_used = total_power * duration  # kWh = total units
-        total_cost = energy_used * PRICE_PER_UNIT  # TZS
+        total_units = total_power * duration  # kWh = units
+        total_cost = total_units * PRICE_PER_UNIT  # TZS
 
         # Advice logic based on units used
-        if energy_used <= 5:
+        if total_units <= 5:
             advice = "✅ Very efficient usage. Keep it up!"
-        elif energy_used <= 15:
+        elif total_units <= 15:
             advice = "🙂 Moderate usage. Try switching off unused appliances."
-        elif energy_used <= 30:
+        elif total_units <= 30:
             advice = "⚠️ High usage detected. Consider energy-saving appliances."
         else:
             advice = "🚨 Very high consumption! Expect a high electricity bill."
 
-        st.session_state.prediction = energy_used
+        st.session_state.prediction = total_units
 
         # Display nicely
         st.success("⚡ Electricity Usage Summary")
         st.markdown(f"""
 ### 🔌 Units & Duration
 
-- **Total Units Used:** `{energy_used:.2f} units (kWh)`  
+- **Total Units Used:** `{total_units:.2f} units (kWh)`  
 - **Duration of Usage:** `{duration} hours`  
-- **1 Unit Price:** `{PRICE_PER_UNIT} TZS / unit`  
 
 ---
 
@@ -204,12 +204,12 @@ elif page == "Visualization":
         ax.set_ylabel("Power (kW)")
         st.pyplot(fig)
 
-        # Show units, duration, and cost
-        estimated_cost = st.session_state.prediction * PRICE_PER_UNIT
+        # Show units, duration, and total cost
+        total_cost = st.session_state.prediction * PRICE_PER_UNIT
         st.info(
             f"""
 🔋 **Total Units Used:** {st.session_state.prediction:.2f} units (kWh)  
 ⏱️ **Duration:** {st.session_state.duration} hours  
-💰 **Estimated Cost:** {estimated_cost:,.0f} TZS  
+💰 **Total Cost:** {total_cost:,.0f} TZS  
 """
         )
