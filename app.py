@@ -11,10 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# ===============================
-# ELECTRICITY PRICE
-# ===============================
-PRICE_PER_UNIT = 350
+PRICE_PER_UNIT = 350  # TZS per kWh
 
 # ===============================
 # LOAD DATA
@@ -23,7 +20,7 @@ PRICE_PER_UNIT = 350
 def load_data():
     try:
         return pd.read_csv("tanzania_power_data.csv")
-    except FileNotFoundError:
+    except:
         return pd.DataFrame()
 
 df = load_data()
@@ -32,15 +29,14 @@ df = load_data()
 # APPLICATION FEATURES
 # ===============================
 APPLICATION_FEATURES = {
-    "Household": ["Kitchen", "Laundry", "Other Use", "Extra Loss"],
+    "Home": ["Kitchen", "Laundry", "Lighting", "Other Appliances", "Extra Loss"],
     "Industry": ["Machine Power", "HVAC", "Lighting", "Extra Loss"],
-    "Hospital": ["ICU", "Labs", "Lighting", "Extra Loss"],
-    "School": ["Classrooms", "Labs", "Lighting", "Extra Loss"],
-    "Mining": ["Excavators", "Conveyors", "Lighting", "Extra Loss"],
-    "Other": ["Custom1", "Custom2", "Custom3", "Extra Loss"]
+    "Hospital": ["ICU", "Laboratory", "Lighting", "Extra Loss"],
+    "School": ["Classrooms", "ICT Labs", "Lighting", "Extra Loss"],
+    "Mining": ["Excavators", "Conveyors", "Lighting", "Extra Loss"]
 }
 
-ALL_FEATURES = list(set(sum(APPLICATION_FEATURES.values(), [])))
+ALL_FEATURES = sum(APPLICATION_FEATURES.values(), [])
 TARGET = "Total_Power"
 
 for col in ALL_FEATURES + [TARGET]:
@@ -61,15 +57,82 @@ def train_model(df):
 model = train_model(df)
 
 # ===============================
+# SMART ADVICE FUNCTION
+# ===============================
+def generate_energy_advice(application, feature_usage):
+    total = sum(feature_usage.values())
+    percentages = {k: (v / total) * 100 for k, v in feature_usage.items()}
+
+    max_feature = max(percentages, key=percentages.get)
+    max_value = percentages[max_feature]
+    high_features = [k for k, v in percentages.items() if v >= 25]
+
+    context = {
+        "Home": {
+            "balanced": "This shows responsible household energy behavior.",
+            "dominant": "Household appliances running for long hours often increase consumption.",
+            "suggestion": "Use energy-efficient appliances, switch off idle devices, and stagger usage."
+        },
+        "Hospital": {
+            "balanced": "This indicates efficient hospital energy management.",
+            "dominant": "Critical medical equipment requires continuous power.",
+            "suggestion": "Optimize non-critical systems and maintain energy-efficient medical equipment."
+        },
+        "Mining": {
+            "balanced": "Energy usage is well distributed across mining operations.",
+            "dominant": "Heavy machinery consumes large continuous power.",
+            "suggestion": "Apply machinery scheduling, load balancing, and preventive maintenance."
+        },
+        "School": {
+            "balanced": "This reflects effective energy use in learning facilities.",
+            "dominant": "Lighting and ICT labs significantly affect school energy usage.",
+            "suggestion": "Automate lighting, limit idle ICT use, and promote energy awareness."
+        },
+        "Industry": {
+            "balanced": "Energy demand is evenly managed across industrial systems.",
+            "dominant": "Industrial machines require high power during peak operation.",
+            "suggestion": "Schedule heavy machinery and invest in efficient industrial equipment."
+        }
+    }
+
+    ctx = context.get(application, context["Home"])
+
+    if max_value < 40:
+        return (
+            "✅ WELL-BALANCED ENERGY USAGE\n\n"
+            f"{ctx['balanced']} Energy is evenly distributed, reducing system overload "
+            "and lowering operational costs.\n\n"
+            f"💡 Recommendation: {ctx['suggestion']}"
+        )
+
+    if max_value >= 45:
+        return (
+            f"⚠️ HIGH ENERGY CONSUMPTION: {max_feature}\n\n"
+            f"{ctx['dominant']} This increases total cost and energy strain.\n\n"
+            f"🔧 Action: Moderate usage, not elimination. {ctx['suggestion']}"
+        )
+
+    if len(high_features) >= 2:
+        return (
+            "⚖️ MULTIPLE HIGH ENERGY CONSUMERS\n\n"
+            f"The following features consume high energy together: {', '.join(high_features)}.\n\n"
+            f"📊 Recommendation: Avoid simultaneous usage and apply moderation. {ctx['suggestion']}"
+        )
+
+    return "ℹ️ Energy analysis completed. Continue monitoring usage."
+
+# ===============================
 # SESSION STATE INIT
 # ===============================
 defaults = {
     "logged_in": False,
     "username": "",
     "application": "",
-    "prediction": None,
+    "page": "Login",
     "feature_values": {},
-    "duration": 1.0
+    "duration": 1.0,
+    "prediction": None,
+    "advice": ""
 }
 
 for k, v in defaults.items():
@@ -77,126 +140,112 @@ for k, v in defaults.items():
         st.session_state[k] = v
 
 # ===============================
-# SIDEBAR NAVIGATION + LOGOUT
+# SIDEBAR NAVIGATION
 # ===============================
 if st.session_state.logged_in:
-    page = st.sidebar.radio("📌 Navigation", ["Prediction", "Visualization"])
+    st.sidebar.title("📌 Navigation")
+    st.session_state.page = st.sidebar.radio(
+        "Go to",
+        ["Prediction", "Visualization"],
+        index=0 if st.session_state.page == "Prediction" else 1
+    )
 
     st.sidebar.markdown("---")
-    if st.sidebar.button("🔄 Change Application / Logout"):
+    if st.sidebar.button("🔄 Logout / Change Application"):
         for k, v in defaults.items():
             st.session_state[k] = v
-        st.rerun()
 else:
-    page = "Login"
+    st.session_state.page = "Login"
 
 # ===============================
 # LOGIN PAGE
 # ===============================
-if page == "Login":
+if st.session_state.page == "Login":
     st.markdown("""
-    <div style="background:linear-gradient(90deg,#0f2027,#203a43,#2c5364);
-    padding:25px;border-radius:15px;color:white;text-align:center;">
-        <h1>⚡ Smart Energy Consumption Dashboard</h1>
-        <p>Login to access energy prediction</p>
+    <div style="background:#1e293b;padding:20px;border-radius:12px;color:white;text-align:center;">
+        <h1>⚡ Enter Your Details to Access Prediction</h1>
     </div>
     """, unsafe_allow_html=True)
 
-    username = st.text_input("👤 Enter Your Name")
-    application = st.selectbox(
-        "🏭 Select Application Type",
+    st.session_state.username = st.text_input("👤 Your Name", st.session_state.username)
+    st.session_state.application = st.selectbox(
+        "🏭 Select Application",
         ["Select"] + list(APPLICATION_FEATURES.keys())
     )
 
     if st.button("➡️ Enter"):
-        if username.strip() == "" or application == "Select":
-            st.warning("⚠️ Verbal Warning. Please enter your Name and Application Type!")
+        if st.session_state.username == "" or st.session_state.application == "Select":
+            st.warning("⚠️ Please enter name and select application.")
         else:
-            st.session_state.username = username.strip()
-            st.session_state.application = application
             st.session_state.logged_in = True
-            st.rerun()
+            st.session_state.page = "Prediction"
 
 # ===============================
 # PREDICTION PAGE
 # ===============================
-elif page == "Prediction":
+elif st.session_state.page == "Prediction":
     st.markdown(f"""
-    <div style="background:linear-gradient(90deg,#203a43,#2c5364);
-    padding:18px;border-radius:15px;color:white;text-align:center;">
-        <h2>⚡ Energy Prediction</h2>
-        <p><b>{st.session_state.username}</b> | {st.session_state.application}</p>
+    <div style="background:#0f766e;padding:15px;border-radius:12px;color:white;text-align:center;">
+        <h2>⚡ Energy Prediction Form</h2>
+        <p>User: <b>{st.session_state.username}</b> | Application: <b>{st.session_state.application}</b></p>
     </div>
     """, unsafe_allow_html=True)
 
     features = APPLICATION_FEATURES[st.session_state.application]
     cols = st.columns(2)
-    feature_values = {}
+    values = {}
 
     for i, feat in enumerate(features):
-        with cols[i % 2]:
-            feature_values[feat] = st.number_input(
-                f"{feat} Power (kW)", min_value=0.0, value=5.0
-            )
+        values[feat] = cols[i % 2].number_input(f"{feat} Power (kW)", 0.0, value=5.0)
 
-    duration = st.slider(
-        "⏱️ Duration of Usage (Hours)", 0.5, 24.0, 5.0, 0.5
-    )
+    st.session_state.duration = st.slider("⏱️ Duration (Hours)", 0.5, 24.0, 5.0, 0.5)
 
     if st.button("🚀 Predict Energy Used", use_container_width=True):
-        st.session_state.feature_values = feature_values
-        st.session_state.duration = duration
+        total_units = sum(values.values()) * st.session_state.duration
+        cost = total_units * PRICE_PER_UNIT
 
-        total_units = sum(feature_values.values()) * duration
-        total_cost = total_units * PRICE_PER_UNIT
+        st.session_state.feature_values = values
         st.session_state.prediction = total_units
+        st.session_state.advice = generate_energy_advice(
+            st.session_state.application,
+            {k: v * st.session_state.duration for k, v in values.items()}
+        )
 
-        advice = []
-        for feat, val in feature_values.items():
-            if total_units > 0 and (val * duration / total_units) * 100 > 30:
-                advice.append(f"⚠️ {feat} consumes a large share of energy.")
+        st.success("⚡ Prediction Completed")
 
-        if not advice:
-            advice.append("✅ Energy usage is well balanced.")
-
-        st.success("⚡ Prediction Complete")
         st.markdown(f"""
-### 🔌 Units & Duration
-- **Total Units Used:** `{total_units:.2f}`  
-- **Duration:** `{duration} hours`
+### 🔌 Results
+- **Total Energy Used:** `{total_units:.2f} kWh`
+- **Estimated Cost:** `{cost:,.0f} TZS`
 
 ---
 
-### 💰 Estimated Cost
-- **Total Cost:** `{total_cost:,.0f} TZS`
-
----
-
-### 🧠 Advice
-{"<br>".join(advice)}
-""", unsafe_allow_html=True)
+### 🧠 Smart Advice
+{st.session_state.advice}
+""")
 
 # ===============================
 # VISUALIZATION PAGE
 # ===============================
-elif page == "Visualization":
+elif st.session_state.page == "Visualization":
     if st.session_state.prediction is None:
-        st.warning("⚠️ Please predict energy first.")
+        st.warning("⚠️ Please make a prediction first.")
     else:
-        st.subheader(f"📊 {st.session_state.application} Power Distribution")
+        st.subheader("📊 Energy Distribution")
 
         plot_df = pd.DataFrame({
             "Category": st.session_state.feature_values.keys(),
             "Power (kW)": st.session_state.feature_values.values()
         })
 
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots()
         ax.bar(plot_df["Category"], plot_df["Power (kW)"])
         ax.set_ylabel("Power (kW)")
+        plt.xticks(rotation=30)
+
         st.pyplot(fig)
 
         st.info(f"""
-🔋 **Total Units Used:** {st.session_state.prediction:.2f}  
-⏱️ **Duration:** {st.session_state.duration} hours  
-💰 **Estimated Cost:** {st.session_state.prediction * PRICE_PER_UNIT:,.0f} TZS
+🔋 Total Energy: {st.session_state.prediction:.2f} kWh  
+💰 Cost: {st.session_state.prediction * PRICE_PER_UNIT:,.0f} TZS
 """)
