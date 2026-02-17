@@ -1,110 +1,3 @@
-import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.tree import DecisionTreeRegressor
-
-# ===============================
-# PAGE CONFIG
-# ===============================
-st.set_page_config(
-    page_title="⚡ Smart Energy Consumption Dashboard",
-    layout="wide"
-)
-
-# ===============================
-# ELECTRICITY PRICE (TZS per kWh)
-# ===============================
-PRICE_PER_UNIT = 350  # 1 unit = 1 kWh
-
-# ===============================
-# LOAD DATA
-# ===============================
-@st.cache_data
-def load_data():
-    try:
-        return pd.read_csv("tanzania_power_data.csv")
-    except FileNotFoundError:
-        return pd.DataFrame()
-
-df = load_data()
-
-# ===============================
-# FEATURES (FOR ML – DEMO)
-# ===============================
-FEATURES = [
-    "Kitchen_Power",
-    "Laundry_Power",
-    "Other_Use",
-    "Extra_Loss",
-    "Voltage",
-    "Current"
-]
-
-TARGET = "Total_Power"
-
-# Ensure required columns exist
-for col in FEATURES + [TARGET]:
-    if col not in df.columns:
-        df[col] = 0.0
-
-# ===============================
-# TRAIN MODEL (DEMO PURPOSE)
-# ===============================
-@st.cache_resource
-def train_model(df):
-    X = df[FEATURES]
-    y = df[TARGET]
-    model = DecisionTreeRegressor(max_depth=5, random_state=42)
-    model.fit(X, y)
-    return model
-
-model = train_model(df)
-
-# ===============================
-# SESSION STATE INIT
-# ===============================
-defaults = {
-    "prediction": None,
-    "duration": 1.0,
-    "kitchen": 0.0,
-    "laundry": 0.0,
-    "other": 0.0,
-    "extra": 0.0
-}
-
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-# ===============================
-# SIDEBAR
-# ===============================
-page = st.sidebar.radio(
-    "📌 Navigation",
-    ["Dashboard", "Prediction", "Visualization"]
-)
-
-# ===============================
-# DASHBOARD
-# ===============================
-if page == "Dashboard":
-    st.markdown("""
-    <div style="background:linear-gradient(90deg,#0f2027,#203a43,#2c5364);
-    padding:25px;border-radius:15px;color:white;text-align:center;">
-        <div style="font-size:55px;">💡</div>
-        <h1>Smart Energy Consumption Dashboard</h1>
-        <p>Predict • Measure • Understand Electricity Usage</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("📄 Records", df.shape[0])
-    c2.metric("📊 Features", len(FEATURES))
-    c3.metric("🎯 Target", "Energy (kWh)")
-    c4.metric("🤖 Model", "Decision Tree")
-
 # ===============================
 # PREDICTION PAGE
 # ===============================
@@ -134,6 +27,13 @@ elif page == "Prediction":
     )
 
     if st.button("🚀 Calculate Energy Consumption", use_container_width=True):
+        # ✅ FIXED: store inputs correctly in session_state
         st.session_state.kitchen = kitchen
         st.session_state.laundry = laundry
-        st.ses
+        st.session_state.other = other
+        st.session_state.extra = extra
+        st.session_state.duration = duration
+
+        # Calculate total power and total units
+        total_power = kitchen + laundry + other + extra
+        total_units = total_power * duration  #*
