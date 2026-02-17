@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -143,50 +142,4 @@ elif page == "Prediction":
 
         # Calculate total power and energy
         total_power = kitchen + laundry + other + extra
-        total_units = total_power * duration  # kWh = units
-        total_cost = total_units * PRICE_PER_UNIT  # TZS
-
-        # Strong actionable advice
-        if total_units <= 5:
-            advice = (
-                "✅ Excellent! Your energy usage is very efficient.\n"
-                "- Keep using energy-saving appliances.\n"
-                "- Switch off devices when not in use.\n"
-                "- Continue monitoring your usage regularly."
-            )
-        elif total_units <= 15:
-            advice = (
-                "🙂 Good, but moderate usage detected.\n"
-                "- Turn off devices when idle.\n"
-                "- Avoid using multiple high-power appliances simultaneously.\n"
-                "- Consider scheduling laundry and kitchen use efficiently."
-            )
-        elif total_units <= 30:
-            advice = (
-                "⚠️ High usage detected.\n"
-                "- Consider replacing older appliances with energy-efficient ones.\n"
-                "- Reduce simultaneous use of high-power devices.\n"
-                "- Monitor your usage daily to spot heavy consumers."
-            )
-        elif total_units <= 60:
-            advice = (
-                "🚨 Very high consumption!\n"
-                "- You are likely paying a high electricity bill.\n"
-                "- Use energy-saving lighting (LED) and appliances.\n"
-                "- Reduce unnecessary usage during peak hours.\n"
-                "- Consider investing in solar or alternative energy sources."
-            )
-        else:
-            advice = (
-                "🔥 Extreme consumption!\n"
-                "- Immediate action required!\n"
-                "- Unplug unused appliances and devices.\n"
-                "- Limit simultaneous usage of heavy-power appliances.\n"
-                "- Consider upgrading to energy-efficient models.\n"
-                "- Check for electrical losses/leaks in your house."
-            )
-
-        st.session_state.prediction = total_units
-
-        # Display results nicely
-        st.success("⚡ Electricity Usag
+        total_units = tota_
