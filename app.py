@@ -146,70 +146,47 @@ elif page == "Prediction":
         total_units = total_power * duration  # kWh = units
         total_cost = total_units * PRICE_PER_UNIT  # TZS
 
-        # Advice logic based on units used
+        # Strong actionable advice
         if total_units <= 5:
-            advice = "✅ Very efficient usage. Keep it up!"
+            advice = (
+                "✅ Excellent! Your energy usage is very efficient.\n"
+                "- Keep using energy-saving appliances.\n"
+                "- Switch off devices when not in use.\n"
+                "- Continue monitoring your usage regularly."
+            )
         elif total_units <= 15:
-            advice = "🙂 Moderate usage. Try switching off unused appliances."
+            advice = (
+                "🙂 Good, but moderate usage detected.\n"
+                "- Turn off devices when idle.\n"
+                "- Avoid using multiple high-power appliances simultaneously.\n"
+                "- Consider scheduling laundry and kitchen use efficiently."
+            )
         elif total_units <= 30:
-            advice = "⚠️ High usage detected. Consider energy-saving appliances."
+            advice = (
+                "⚠️ High usage detected.\n"
+                "- Consider replacing older appliances with energy-efficient ones.\n"
+                "- Reduce simultaneous use of high-power devices.\n"
+                "- Monitor your usage daily to spot heavy consumers."
+            )
+        elif total_units <= 60:
+            advice = (
+                "🚨 Very high consumption!\n"
+                "- You are likely paying a high electricity bill.\n"
+                "- Use energy-saving lighting (LED) and appliances.\n"
+                "- Reduce unnecessary usage during peak hours.\n"
+                "- Consider investing in solar or alternative energy sources."
+            )
         else:
-            advice = "🚨 Very high consumption! Expect a high electricity bill."
+            advice = (
+                "🔥 Extreme consumption!\n"
+                "- Immediate action required!\n"
+                "- Unplug unused appliances and devices.\n"
+                "- Limit simultaneous usage of heavy-power appliances.\n"
+                "- Consider upgrading to energy-efficient models.\n"
+                "- Check for electrical losses/leaks in your house."
+            )
 
         st.session_state.prediction = total_units
 
-        # Display nicely
-        st.success("⚡ Electricity Usage Summary")
-        st.markdown(f"""
-### 🔌 Units & Duration
-
-- **Total Units Used:** `{total_units:.2f} units (kWh)`  
-- **Duration of Usage:** `{duration} hours`  
-
----
-
-### 💰 Estimated Cost
-- **Total Cost:** `{total_cost:,.0f} TZS`
-
----
-
-### 🧠 Advice
-**{advice}**
-""")
-
-# ===============================
-# VISUALIZATION PAGE
-# ===============================
-elif page == "Visualization":
-    st.header("📊 Energy Usage Visualization")
-
-    if st.session_state.prediction is None:
-        st.warning("⚠️ Please calculate energy first from the Prediction page.")
-    else:
-        # Prepare data for plot
-        plot_df = pd.DataFrame({
-            "Category": ["Kitchen", "Laundry", "Other Use", "Extra Loss"],
-            "Power (kW)": [
-                st.session_state.kitchen,
-                st.session_state.laundry,
-                st.session_state.other,
-                st.session_state.extra
-            ]
-        })
-
-        # Plot bar chart
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.bar(plot_df["Category"], plot_df["Power (kW)"], color="#38bdf8")
-        ax.set_title("Household Power Distribution")
-        ax.set_ylabel("Power (kW)")
-        st.pyplot(fig)
-
-        # Show units, duration, and total cost
-        total_cost = st.session_state.prediction * PRICE_PER_UNIT
-        st.info(
-            f"""
-🔋 **Total Units Used:** {st.session_state.prediction:.2f} units (kWh)  
-⏱️ **Duration:** {st.session_state.duration} hours  
-💰 **Total Cost:** {total_cost:,.0f} TZS  
-"""
-        )
+        # Display results nicely
+        st.success("⚡ Electricity Usag
