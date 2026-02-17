@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # ===============================
-# ELECTRICITY PRICE
+# ELECTRICITY PRICE (TZS per kWh)
 # ===============================
 PRICE_PER_UNIT = 350
 
@@ -29,34 +29,22 @@ def load_data():
 df = load_data()
 
 # ===============================
-# APPLICATION FEATURES
+# FEATURES (FOR ML)
 # ===============================
-APPLICATION_FEATURES = {
-    "Household": ["Kitchen", "Laundry", "Lighting", "Extra Loss"],
-    "Industry": ["Machine Power", "HVAC", "Lighting", "Extra Loss"],
-    "Hospital": ["ICU", "Labs", "Lighting", "Extra Loss"],
-    "School": ["Classrooms", "Labs", "Lighting", "Extra Loss"],
-    "Mining": ["Excavators", "Conveyors", "Lighting", "Extra Loss"],
-    "Other": ["Custom1", "Custom2", "Custom3", "Extra Loss"]
-}
-
-# ===============================
-# FEATURES FOR ML DEMO (all)
-# ===============================
-ALL_FEATURES = sum(APPLICATION_FEATURES.values(), [])  # flatten list of features
+FEATURES = ["Kitchen_Power","Laundry_Power","Other_Use","Extra_Loss","Voltage","Current"]
 TARGET = "Total_Power"
 
-# Ensure all columns exist
-for col in ALL_FEATURES + [TARGET]:
+# Ensure required columns exist
+for col in FEATURES + [TARGET]:
     if col not in df.columns:
         df[col] = 0.0
 
 # ===============================
-# TRAIN MODEL
+# TRAIN MODEL (DEMO)
 # ===============================
 @st.cache_resource
 def train_model(df):
-    X = df[ALL_FEATURES]
+    X = df[FEATURES]
     y = df[TARGET]
     model = DecisionTreeRegressor(max_depth=5, random_state=42)
     model.fit(X, y)
@@ -67,85 +55,109 @@ model = train_model(df)
 # ===============================
 # SESSION STATE INIT
 # ===============================
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
-if "application" not in st.session_state:
-    st.session_state.application = ""
-if "feature_values" not in st.session_state:
-    st.session_state.feature_values = {}
-if "duration" not in st.session_state:
-    st.session_state.duration = 1.0
-if "prediction" not in st.session_state:
-    st.session_state.prediction = None
-if "login_submitted" not in st.session_state:
-    st.session_state.login_submitted = False
+for key in ["authenticated","prediction","duration","kitchen","laundry","other","extra","username","application_type"]:
+    if key not in st.session_state:
+        st.session_state[key] = None if key in ["prediction","username","application_type"] else 0.0
+st.session_state.authenticated = False if st.session_state.authenticated is None else st.session_state.authenticated
+
+# ===============================
+# SIDEBAR NAVIGATION
+# ===============================
+if st.session_state.authenticated:
+    page = st.sidebar.radio("📌 Navigation", ["Prediction", "Visualization"])
+else:
+    page = "Login"
 
 # ===============================
 # LOGIN PAGE
 # ===============================
-if not st.session_state.logged_in:
-    st.title("⚡ Energy Prediction Access")
-    st.subheader("Enter Your Details to Access Prediction")
-
-    username = st.text_input("👤 Username")
-    application = st.selectbox("🏢 Application Type", list(APPLICATION_FEATURES.keys()))
-
-    if st.button("🔑 Enter"):
-        if username.strip() == "" or application.strip() == "":
-            st.warning("⚠️ Verbal Warning. Please provide both Username and Application Type!")
+if page == "Login":
+    st.markdown("""
+    <div style="background:linear-gradient(90deg,#0f2027,#203a43,#2c5364);
+    padding:20px;border-radius:12px;color:white;text-align:center;">
+        <h1>⚡ Enter Your Details to Access Prediction</h1>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    username = st.text_input("👤 Enter Your Name")
+    application_type = st.selectbox("🏭 Select Application Type", ["Select","Household","Industry","Hospital","Other"])
+    
+    if st.button("➡️ Enter"):
+        if username.strip() == "" or application_type == "Select":
+            st.warning("⚠️ Verbal Warning. Please enter your Name and Application Type!")
         else:
-            st.session_state.username = username
-            st.session_state.application = application
-            st.session_state.logged_in = True
-            st.session_state.login_submitted = True
-
-    if st.session_state.login_submitted:
-        st.session_state.login_submitted = False
-        st.experimental_rerun()
+            st.session_state.username = username.strip()
+            st.session_state.application_type = application_type
+            st.session_state.authenticated = True
+            st.experimental_rerun()  # go to Prediction page
 
 # ===============================
 # PREDICTION PAGE
 # ===============================
-if st.session_state.logged_in:
-    st.markdown(f"### 🧮 Predict Energy Usage | User: **{st.session_state.username}** | Application: **{st.session_state.application}**")
-
-    features = APPLICATION_FEATURES[st.session_state.application]
-    cols = st.columns(2)
-    feature_values = {}
-
-    for i, feat in enumerate(features):
-        col = cols[i % 2]
-        feature_values[feat] = col.number_input(f"{feat} Power (kW)", 0.0, value=5.0)
-
+elif page == "Prediction" and st.session_state.authenticated:
+    st.markdown(f"""
+    <div style="background:linear-gradient(90deg,#203a43,#2c5364);
+    padding:15px;border-radius:12px;color:white;text-align:center;">
+        <h2>⚡ Energy Prediction Form</h2>
+        <p>User: <b>{st.session_state.username}</b> | Application: <b>{st.session_state.application_type}</b></p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        kitchen = st.number_input("🍳 Kitchen Power (kW)", 0.0, value=4.5)
+        laundry = st.number_input("🧺 Laundry Power (kW)", 0.0, value=6.0)
+        other = st.number_input("💡 Other Usage (kW)", 0.0, value=3.0)
+    with col2:
+        extra = st.number_input("🔥 Extra Loss (kW)", 0.0, value=2.0)
+        voltage = st.number_input("⚡ Voltage (V)", 0.0, value=220.0)
+        current = st.number_input("🔁 Current (A)", 0.0, value=4.5)
+    
     duration = st.slider("⏱️ Duration of Usage (Hours)", 0.5, 24.0, 5.0, 0.5)
-
-    if st.button("🚀 Predict Energy Usage", use_container_width=True):
-        st.session_state.feature_values = feature_values
+    
+    if st.button("🚀 Predict Energy Used", use_container_width=True):
+        # Store input
+        st.session_state.kitchen = kitchen
+        st.session_state.laundry = laundry
+        st.session_state.other = other
+        st.session_state.extra = extra
         st.session_state.duration = duration
-
-        # Total units and cost
-        total_units = sum(feature_values.values()) * duration
+        
+        # Compute feature energy
+        feature_energy = {
+            "Kitchen": kitchen * duration,
+            "Laundry": laundry * duration,
+            "Other Use": other * duration,
+            "Extra Loss": extra * duration
+        }
+        total_units = sum(feature_energy.values())
         total_cost = total_units * PRICE_PER_UNIT
-        st.session_state.prediction = total_units
-
-        # High consumption advice (>30% of total)
+        
+        # Advice based on top consuming features (>30%)
         advice_list = []
-        for feat, val in feature_values.items():
-            contribution = (val * duration / total_units) * 100
+        for feat, energy in feature_energy.items():
+            contribution = (energy / total_units) * 100
             if contribution > 30:
-                advice_list.append(f"⚠️ {feat} consumes a lot! Consider efficient usage.")
-
+                if feat == "Kitchen":
+                    advice_list.append("⚠️ Kitchen: Use lids, batch cooking to save energy.")
+                elif feat == "Laundry":
+                    advice_list.append("⚠️ Laundry: Wash full loads, avoid peak hours.")
+                elif feat == "Other Use":
+                    advice_list.append("⚠️ Other Usage: Turn off idle devices.")
+                elif feat == "Extra Loss":
+                    advice_list.append("⚠️ Extra Loss: Check wiring and appliances.")
         if not advice_list:
-            advice_list.append("✅ Your energy usage is balanced across appliances.")
-
-        st.success("⚡ Predict Energy Used")
-        st.markdown(
-            f"""
+            advice_list.append("✅ Energy usage is balanced across appliances.")
+        
+        st.session_state.prediction = total_units
+        final_advice = "\n".join(advice_list)
+        
+        # Display results
+        st.success("⚡ Prediction Complete")
+        st.markdown(f"""
 ### 🔌 Units & Duration
-- **Total Units Used:** `{total_units:.2f} units`  
-- **Duration of Usage:** `{duration} hours`  
+- **Total Units Used:** `{total_units:.2f}`  
+- **Duration:** `{duration} hours`
 
 ---
 
@@ -154,33 +166,30 @@ if st.session_state.logged_in:
 
 ---
 
-### 🧠 Advice Based on High Consumption
-{'\n'.join(advice_list)}
-"""
-        )
+### 🧠 Advice
+{final_advice}
+""")
 
-    # ===============================
-    # VISUALIZATION
-    # ===============================
-    st.header("📊 Energy Usage Visualization")
+# ===============================
+# VISUALIZATION PAGE
+# ===============================
+elif page == "Visualization" and st.session_state.authenticated:
     if st.session_state.prediction is None:
-        st.info("🔹 Please predict energy usage first.")
+        st.warning("⚠️ Please predict energy first on the Prediction page.")
     else:
+        st.subheader(f"📊 {st.session_state.application_type} Power Distribution")
         plot_df = pd.DataFrame({
-            "Category": list(st.session_state.feature_values.keys()),
-            "Power (kW)": list(st.session_state.feature_values.values())
+            "Category":["Kitchen","Laundry","Other Use","Extra Loss"],
+            "Power (kW)":[st.session_state.kitchen,st.session_state.laundry,st.session_state.other,st.session_state.extra]
         })
-
         fig, ax = plt.subplots(figsize=(8,5))
         ax.bar(plot_df["Category"], plot_df["Power (kW)"], color="#38bdf8")
-        ax.set_title(f"{st.session_state.application} Power Distribution")
-        ax.set_ylabel("Power (kW)")
+        ax.set_ylabel("Power (kWh)")
         st.pyplot(fig)
-
-        st.info(
-            f"""
-🔋 **Total Units Used:** {st.session_state.prediction:.2f} units  
+        
+        total_cost = st.session_state.prediction * PRICE_PER_UNIT
+        st.info(f"""
+🔋 **Total Units Used:** {st.session_state.prediction:.2f}  
 ⏱️ **Duration:** {st.session_state.duration} hours  
-💰 **Estimated Cost:** {st.session_state.prediction*PRICE_PER_UNIT:,.0f} TZS
-"""
-        )
+💰 **Total Cost:** {total_cost:,.0f} TZS
+""")
