@@ -1,3 +1,110 @@
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.tree import DecisionTreeRegressor
+
+# ===============================
+# PAGE CONFIG
+# ===============================
+st.set_page_config(
+    page_title="⚡ Smart Energy Consumption Dashboard",
+    layout="wide"
+)
+
+# ===============================
+# ELECTRICITY PRICE (TZS per kWh)
+# ===============================
+PRICE_PER_UNIT = 350  # 1 unit = 1 kWh
+
+# ===============================
+# LOAD DATA
+# ===============================
+@st.cache_data
+def load_data():
+    try:
+        return pd.read_csv("tanzania_power_data.csv")
+    except FileNotFoundError:
+        return pd.DataFrame()
+
+df = load_data()
+
+# ===============================
+# FEATURES (FOR ML – DEMO)
+# ===============================
+FEATURES = [
+    "Kitchen_Power",
+    "Laundry_Power",
+    "Other_Use",
+    "Extra_Loss",
+    "Voltage",
+    "Current"
+]
+
+TARGET = "Total_Power"
+
+# Ensure required columns exist
+for col in FEATURES + [TARGET]:
+    if col not in df.columns:
+        df[col] = 0.0
+
+# ===============================
+# TRAIN MODEL (DEMO PURPOSE)
+# ===============================
+@st.cache_resource
+def train_model(df):
+    X = df[FEATURES]
+    y = df[TARGET]
+    model = DecisionTreeRegressor(max_depth=5, random_state=42)
+    model.fit(X, y)
+    return model
+
+model = train_model(df)
+
+# ===============================
+# SESSION STATE INIT
+# ===============================
+defaults = {
+    "prediction": None,
+    "duration": 1.0,
+    "kitchen": 0.0,
+    "laundry": 0.0,
+    "other": 0.0,
+    "extra": 0.0
+}
+
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# ===============================
+# SIDEBAR
+# ===============================
+page = st.sidebar.radio(
+    "📌 Navigation",
+    ["Dashboard", "Prediction", "Visualization"]
+)
+
+# ===============================
+# DASHBOARD
+# ===============================
+if page == "Dashboard":
+    st.markdown("""
+    <div style="background:linear-gradient(90deg,#0f2027,#203a43,#2c5364);
+    padding:25px;border-radius:15px;color:white;text-align:center;">
+        <div style="font-size:55px;">💡</div>
+        <h1>Smart Energy Consumption Dashboard</h1>
+        <p>Predict • Measure • Understand Electricity Usage</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("📄 Records", df.shape[0])
+    c2.metric("📊 Features", len(FEATURES))
+    c3.metric("🎯 Target", "Energy (kWh)")
+    c4.metric("🤖 Model", "Decision Tree")
+
 # ===============================
 # PREDICTION PAGE
 # ===============================
@@ -27,13 +134,106 @@ elif page == "Prediction":
     )
 
     if st.button("🚀 Calculate Energy Consumption", use_container_width=True):
-        # ✅ FIXED: store inputs correctly in session_state
         st.session_state.kitchen = kitchen
         st.session_state.laundry = laundry
         st.session_state.other = other
         st.session_state.extra = extra
         st.session_state.duration = duration
 
-        # Calculate total power and total units
+        # Total power and units
         total_power = kitchen + laundry + other + extra
-        total_units = total_power * duration  #*
+        total_units = total_power * duration  # kWh
+        total_cost = total_units * PRICE_PER_UNIT  # TZS
+
+        # Strong actionable advice
+        if total_units <= 5:
+            advice = (
+                "✅ Excellent! Your energy usage is very efficient.\n"
+                "- Keep using energy-saving appliances.\n"
+                "- Switch off devices when not in use."
+            )
+        elif total_units <= 15:
+            advice = (
+                "🙂 Moderate usage detected.\n"
+                "- Turn off devices when idle.\n"
+                "- Avoid using multiple high-power appliances at the same time."
+            )
+        elif total_units <= 30:
+            advice = (
+                "⚠️ High usage detected.\n"
+                "- Replace older appliances with energy-efficient ones.\n"
+                "- Reduce simultaneous use of high-power devices."
+            )
+        elif total_units <= 60:
+            advice = (
+                "🚨 Very high consumption!\n"
+                "- Likely high electricity bill.\n"
+                "- Use LED lighting and energy-saving appliances.\n"
+                "- Reduce usage during peak hours."
+            )
+        else:
+            advice = (
+                "🔥 Extreme consumption!\n"
+                "- Immediate action required!\n"
+                "- Unplug unused devices.\n"
+                "- Limit simultaneous use of heavy-power appliances.\n"
+                "- Check for electrical leaks or losses."
+            )
+
+        st.session_state.prediction = total_units
+
+        # Display results
+        st.success("⚡ Electricity Usage Summary")
+        st.markdown(
+            f"""
+### 🔌 Units & Duration
+
+- **Total Units Used:** `{total_units:.2f} units (kWh)`  
+- **Duration of Usage:** `{duration} hours`  
+
+---
+
+### 💰 Estimated Cost
+- **Total Cost:** `{total_cost:,.0f} TZS`
+
+---
+
+### 🧠 Strong Advice
+{advice}
+"""
+        )
+
+# ===============================
+# VISUALIZATION PAGE
+# ===============================
+elif page == "Visualization":
+    st.header("📊 Energy Usage Visualization")
+
+    if st.session_state.prediction is None:
+        st.warning("⚠️ Please calculate energy first from the Prediction page.")
+    else:
+        plot_df = pd.DataFrame({
+            "Category": ["Kitchen", "Laundry", "Other Use", "Extra Loss"],
+            "Power (kW)": [
+                st.session_state.kitchen,
+                st.session_state.laundry,
+                st.session_state.other,
+                st.session_state.extra
+            ]
+        })
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.bar(plot_df["Category"], plot_df["Power (kW)"], color="#38bdf8")
+        ax.set_title("Household Power Distribution")
+        ax.set_ylabel("Power (kW)")
+        st.pyplot(fig)
+
+        # Show units, duration, and total cost
+        total_cost = st.session_state.prediction * PRICE_PER_UNIT
+        st.info(
+            f"""
+🔋 **Total Units Used:** {st.session_state.prediction:.2f} units (kWh)  
+⏱️ **Duration:** {st.session_state.duration} hours  
+💰 **Total Cost:** {total_cost:,.0f} TZS
+"""
+        )
