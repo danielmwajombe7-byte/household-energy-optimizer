@@ -12,11 +12,20 @@ st.set_page_config(
 )
 
 # ===============================
+# ELECTRICITY PRICE (TZS per kWh)
+# ===============================
+PRICE_PER_UNIT = 350  # Average Tanzania rate
+
+# ===============================
 # LOAD DATA
 # ===============================
 @st.cache_data
 def load_data():
-    return pd.read_csv("tanzania_power_data.csv")
+    try:
+        return pd.read_csv("tanzania_power_data.csv")
+    except FileNotFoundError:
+        # Return empty dataframe if file not found
+        return pd.DataFrame()
 
 df = load_data()
 
@@ -121,7 +130,7 @@ elif page == "Prediction":
         "⏱️ Duration of Usage (Hours)",
         min_value=0.5,
         max_value=24.0,
-        value=1.0,
+        value=12.5,
         step=0.5
     )
 
@@ -132,18 +141,43 @@ elif page == "Prediction":
         st.session_state.extra = extra
         st.session_state.duration = duration
 
+        # Calculate total power and energy
         total_power = kitchen + laundry + other + extra
         energy_used = total_power * duration  # kWh
+        total_cost = energy_used * PRICE_PER_UNIT  # TZS
+
+        # Advice logic
+        if energy_used <= 5:
+            advice = "✅ Very efficient usage. Keep it up!"
+        elif energy_used <= 15:
+            advice = "🙂 Moderate usage. Try switching off unused appliances."
+        elif energy_used <= 30:
+            advice = "⚠️ High usage detected. Consider energy-saving appliances."
+        else:
+            advice = "🚨 Very high consumption! Expect a high electricity bill."
 
         st.session_state.prediction = energy_used
 
-        st.success(f"""
-        ⚡ **Prediction Result**
+        # Display nicely
+        st.success("⚡ Prediction Result")
+        st.markdown(f"""
+### 🔌 Electricity Usage Summary
 
-        • Total Power Used: **{total_power:.2f} kW**  
-        • Duration of Usage: **{duration} hours**  
-        • Total Energy Consumption: **{energy_used:.2f} kWh**
-        """)
+- **Total Power Used:** `{total_power:.2f} kW`  
+- **Duration of Usage:** `{duration} hours`  
+- **Total Energy Consumption:** `{energy_used:.2f} kWh`  
+
+---
+
+### 💰 Cost Estimation
+- **Price per Unit:** `{PRICE_PER_UNIT} TZS / kWh`  
+- **Estimated Total Cost:** `{total_cost:,.0f} TZS`
+
+---
+
+### 🧠 Advice
+**{advice}**
+""")
 
 # ===============================
 # VISUALIZATION PAGE
@@ -159,19 +193,4 @@ elif page == "Visualization":
             "Power (kW)": [
                 st.session_state.kitchen,
                 st.session_state.laundry,
-                st.session_state.other,
-                st.session_state.extra
-            ]
-        })
-
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.bar(plot_df["Category"], plot_df["Power (kW)"], color="#38bdf8")
-        ax.set_title("Household Power Distribution")
-        ax.set_ylabel("Power (kW)")
-
-        st.pyplot(fig)
-
-        st.info(
-            f"🔋 **Total Energy Used:** {st.session_state.prediction:.2f} kWh "
-            f"over **{st.session_state.duration} hours**"
-        )
+                st.ses
