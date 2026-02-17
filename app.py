@@ -136,10 +136,4 @@ elif page == "Prediction":
     if st.button("🚀 Calculate Energy Consumption", use_container_width=True):
         st.session_state.kitchen = kitchen
         st.session_state.laundry = laundry
-        st.session_state.other = other
-        st.session_state.extra = extra
-        st.session_state.duration = duration
-
-        # Calculate total power and energy
-        total_power = kitchen + laundry + other + extra
-        total_units = tota_
+        st.ses
