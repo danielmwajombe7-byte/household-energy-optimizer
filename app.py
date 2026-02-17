@@ -48,7 +48,7 @@ for col in ALL_FEATURES + [TARGET]:
         df[col] = 0.0
 
 # ===============================
-# TRAIN MODEL (DEMO)
+# TRAIN MODEL
 # ===============================
 @st.cache_resource
 def train_model(df):
@@ -69,26 +69,26 @@ for key in ["logged_in","username","application","feature_values","duration","pr
 st.session_state.logged_in = False if st.session_state.logged_in is None else st.session_state.logged_in
 
 # ===============================
-# SIDEBAR NAVIGATION
+# PAGE SELECTION
 # ===============================
-if st.session_state.logged_in:
-    page = st.sidebar.radio("📌 Navigation", ["Prediction", "Visualization"])
+if not st.session_state.logged_in:
+    page = "Login"
 else:
-    page = "Dashboard"
+    page = st.sidebar.radio("📌 Navigation", ["Prediction", "Visualization"])
 
 # ===============================
-# DASHBOARD / LOGIN PAGE
+# LOGIN PAGE
 # ===============================
-if page == "Dashboard" and not st.session_state.logged_in:
+if page == "Login":
     st.markdown("""
     <div style="background:linear-gradient(90deg,#0f2027,#203a43,#2c5364);
     padding:25px;border-radius:15px;color:white;text-align:center;">
         <h1>💡 Smart Energy Consumption Dashboard</h1>
-        <p>Predict • Measure • Understand Electricity Usage</p>
+        <p>Login to Access Energy Prediction</p>
     </div>
     """, unsafe_allow_html=True)
-
-    st.markdown("## Enter Your Details to Access Prediction")
+    
+    st.markdown("## Enter Your Details")
     username = st.text_input("👤 Username")
     application_type = st.selectbox("🏭 Application Type", ["Select"] + list(APPLICATION_FEATURES.keys()))
 
@@ -99,7 +99,7 @@ if page == "Dashboard" and not st.session_state.logged_in:
             st.session_state.username = username.strip()
             st.session_state.application = application_type
             st.session_state.logged_in = True
-            st.experimental_rerun()  # go directly to Prediction page
+            st.experimental_rerun()  # redirect to Prediction page
 
 # ===============================
 # PREDICTION PAGE
