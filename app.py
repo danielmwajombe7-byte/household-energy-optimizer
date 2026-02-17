@@ -99,42 +99,17 @@ if page == "Dashboard":
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    c1, c2, c3, c4 = st.columns(4)
+    # Simple metrics
+    col1, col2, col3 = st.columns(3)
+    col1.metric("📄 Records", df.shape[0])
+    col2.metric("📊 Features", len(FEATURES))
+    col3.metric("🎯 Target", "Energy (kWh)")
 
-    c1.markdown(f"""
-    <div style="background:#4ade80;padding:20px;border-radius:10px;text-align:center;color:white;">
-    <h3>📄 Records</h3>
-    <p style="font-size:25px;">{df.shape[0]}</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    c2.markdown(f"""
-    <div style="background:#60a5fa;padding:20px;border-radius:10px;text-align:center;color:white;">
-    <h3>📊 Features</h3>
-    <p style="font-size:25px;">{len(FEATURES)}</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    c3.markdown(f"""
-    <div style="background:#facc15;padding:20px;border-radius:10px;text-align:center;color:white;">
-    <h3>🎯 Target</h3>
-    <p style="font-size:25px;">Energy (kWh)</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    c4.markdown(f"""
-    <div style="background:#f472b6;padding:20px;border-radius:10px;text-align:center;color:white;">
-    <h3>🤖 Model</h3>
-    <p style="font-size:25px;">Decision Tree</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Optional: Mini bar chart for feature demo
-    st.subheader("Feature Power Example (kW)")
-    demo_features = [4.5, 6.0, 3.0, 2.0]
-    demo_names = ["Kitchen", "Laundry", "Other", "Extra Loss"]
+    # Example features
+    st.subheader("Example Appliance Power (kW)")
+    feature_example = {"Kitchen":4.5, "Laundry":6.0, "Other":3.0, "Extra Loss":2.0}
     fig, ax = plt.subplots(figsize=(6,2))
-    ax.barh(demo_names, demo_features, color="#60a5fa")
+    ax.barh(list(feature_example.keys()), list(feature_example.values()), color="#60a5fa")
     ax.set_xlabel("Power (kW)")
     st.pyplot(fig)
 
