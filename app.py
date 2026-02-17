@@ -40,7 +40,7 @@ for col in FEATURES + [TARGET]:
         df[col] = 0.0
 
 # ===============================
-# TRAIN MODEL (FOR DEMO PURPOSE)
+# TRAIN MODEL (DEMO PURPOSE)
 # ===============================
 @st.cache_resource
 def train_model(df):
@@ -53,10 +53,19 @@ def train_model(df):
 model = train_model(df)
 
 # ===============================
-# SESSION STATE
+# SESSION STATE INIT
 # ===============================
-if "prediction" not in st.session_state:
-    st.session_state.prediction = None
+defaults = {
+    "prediction": None,
+    "kitchen": 0.0,
+    "laundry": 0.0,
+    "other": 0.0,
+    "extra": 0.0
+}
+
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
 # ===============================
 # SIDEBAR
@@ -77,7 +86,7 @@ if page == "Dashboard":
     c1.metric("📄 Records", df.shape[0])
     c2.metric("📊 Features", len(FEATURES))
     c3.metric("🎯 Target", "Total Energy Used")
-    c4.metric("📉 RMSE", "0.174")
+    c4.metric("📉 Model", "Decision Tree")
 
 # ===============================
 # PREDICTION
@@ -88,17 +97,33 @@ elif page == "Prediction":
     col1, col2 = st.columns(2)
 
     with col1:
-        kitchen = st.number_input("Kitchen Power Usage (kW)", 0.0, value=4.5)
-        laundry = st.number_input("Laundry Power Usage (kW)", 0.0, value=6.0)
-        other = st.number_input("Other Use (Bulbs, TV, Phone Charging) (kW)", 0.0, value=3.0)
+        kitchen = st.number_input(
+            "Kitchen Power Usage (kW)", 0.0, value=4.5
+        )
+        laundry = st.number_input(
+            "Laundry Power Usage (kW)", 0.0, value=6.0
+        )
+        other = st.number_input(
+            "Other Use (Bulbs, TV, Charging) (kW)", 0.0, value=3.0
+        )
 
     with col2:
-        extra = st.number_input("Extra Power Loss (kW)", 0.0, value=2.0)
-        voltage = st.number_input("Electric Voltage (V)", 0.0, value=220.0)
-        current = st.number_input("Current Intensity (A)", 0.0, value=4.5)
+        extra = st.number_input(
+            "Extra Power Loss (kW)", 0.0, value=2.0
+        )
+        voltage = st.number_input(
+            "Electric Voltage (V)", 0.0, value=220.0
+        )
+        current = st.number_input(
+            "Current Intensity (A)", 0.0, value=4.5
+        )
 
     if st.button("🚀 Calculate Total Energy Used", use_container_width=True):
-        # ✅ CORRECT FIX (NO ML FOR TOTAL)
+        st.session_state.kitchen = kitchen
+        st.session_state.laundry = laundry
+        st.session_state.other = other
+        st.session_state.extra = extra
+
         total_energy = kitchen + laundry + other + extra
         st.session_state.prediction = total_energy
 
@@ -116,17 +141,12 @@ elif page == "Visualization":
         st.warning("⚠️ Please calculate energy first.")
     else:
         plot_df = pd.DataFrame({
-            "Category": [
-                "Kitchen",
-                "Laundry",
-                "Other Use",
-                "Extra Loss"
-            ],
+            "Category": ["Kitchen", "Laundry", "Other Use", "Extra Loss"],
             "Power (kW)": [
-                kitchen,
-                laundry,
-                other,
-                extra
+                st.session_state.kitchen,
+                st.session_state.laundry,
+                st.session_state.other,
+                st.session_state.extra
             ]
         })
 
@@ -134,6 +154,7 @@ elif page == "Visualization":
         ax.bar(plot_df["Category"], plot_df["Power (kW)"])
         ax.set_title("Household Energy Distribution")
         ax.set_ylabel("Power (kW)")
+
         st.pyplot(fig)
 
         st.info(
