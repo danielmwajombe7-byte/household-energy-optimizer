@@ -29,30 +29,29 @@ def load_data():
 df = load_data()
 
 # ===============================
-# FEATURES (FOR ML – DEMO)
+# APPLICATION FEATURES
 # ===============================
-FEATURES = [
-    "Kitchen_Power",
-    "Laundry_Power",
-    "Other_Use",
-    "Extra_Loss",
-    "Voltage",
-    "Current"
-]
+APP_FEATURES = {
+    "Household": ["Kitchen_Power", "Laundry_Power", "Other_Use", "Extra_Loss"],
+    "Industry": ["Machine_Power", "Lighting_Power", "HVAC_Power", "Extra_Loss"],
+    "Hospital": ["ICU_Power", "Lab_Power", "Lighting_Power", "Extra_Loss"],
+    "Other": ["General_Use", "Lighting_Power", "Extra_Loss"]
+}
 
 TARGET = "Total_Power"
 
-# Ensure required columns exist
-for col in FEATURES + [TARGET]:
+# Ensure columns exist in df
+all_features = set(sum(APP_FEATURES.values(), []))
+for col in all_features.union({TARGET}):
     if col not in df.columns:
         df[col] = 0.0
 
 # ===============================
-# TRAIN MODEL (DEMO PURPOSE)
+# TRAIN DEMO MODEL
 # ===============================
 @st.cache_resource
 def train_model(df):
-    X = df[FEATURES]
+    X = df[list(all_features)]
     y = df[TARGET]
     model = DecisionTreeRegressor(max_depth=5, random_state=42)
     model.fit(X, y)
@@ -66,12 +65,10 @@ model = train_model(df)
 defaults = {
     "prediction": None,
     "duration": 1.0,
-    "kitchen": 0.0,
-    "laundry": 0.0,
-    "other": 0.0,
-    "extra": 0.0
+    "feature_values": {},
+    "user_name": "",
+    "application_type": "Household"
 }
-
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -99,18 +96,27 @@ if page == "Dashboard":
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Simple metrics
+    # User input
+    st.subheader("👤 User Info & Application")
+    col1, col2 = st.columns(2)
+    with col1:
+        user_name = st.text_input("Enter your name", st.session_state.user_name)
+        st.session_state.user_name = user_name
+    with col2:
+        application_type = st.selectbox("Select Application Type", list(APP_FEATURES.keys()), index=list(APP_FEATURES.keys()).index(st.session_state.application_type))
+        st.session_state.application_type = application_type
+
+    # Metrics with mini chart
+    st.subheader("📊 Dashboard Summary")
+    feature_example = {feat.replace("_Power","").replace("_"," "): 5 for feat in APP_FEATURES[application_type]}
     col1, col2, col3 = st.columns(3)
     col1.metric("📄 Records", df.shape[0])
-    col2.metric("📊 Features", len(FEATURES))
+    col2.metric("📊 Features", len(APP_FEATURES[application_type]))
     col3.metric("🎯 Target", "Energy (kWh)")
 
-    # Example features
-    st.subheader("Example Appliance Power (kW)")
-    feature_example = {"Kitchen":4.5, "Laundry":6.0, "Other":3.0, "Extra Loss":2.0}
     fig, ax = plt.subplots(figsize=(6,2))
     ax.barh(list(feature_example.keys()), list(feature_example.values()), color="#60a5fa")
-    ax.set_xlabel("Power (kW)")
+    ax.set_xlabel("Power (kWh)")
     st.pyplot(fig)
 
 # ===============================
@@ -118,72 +124,46 @@ if page == "Dashboard":
 # ===============================
 elif page == "Prediction":
     st.header("🧮 Energy Prediction Input")
-
+    features = APP_FEATURES[st.session_state.application_type]
+    feature_values = {}
     col1, col2 = st.columns(2)
-
-    with col1:
-        kitchen = st.number_input("🍳 Kitchen Power (kW)", 0.0, value=4.5)
-        laundry = st.number_input("🧺 Laundry Power (kW)", 0.0, value=6.0)
-        other = st.number_input("💡 Other Usage (kW)", 0.0, value=3.0)
-
-    with col2:
-        extra = st.number_input("🔥 Extra Loss (kW)", 0.0, value=2.0)
-        voltage = st.number_input("⚡ Voltage (V)", 0.0, value=220.0)
-        current = st.number_input("🔁 Current (A)", 0.0, value=4.5)
+    for i, feat in enumerate(features):
+        label = feat.replace("_Power","").replace("_"," ")
+        if i %2 == 0:
+            feature_values[feat] = col1.number_input(f"{label} Power (kW)", 0.0, value=5.0)
+        else:
+            feature_values[feat] = col2.number_input(f"{label} Power (kW)", 0.0, value=5.0)
 
     st.markdown("---")
-
-    duration = st.slider(
-        "⏱️ Duration of Usage (Hours)",
-        min_value=0.5,
-        max_value=24.0,
-        value=5.0,
-        step=0.5
-    )
+    duration = st.slider("⏱️ Duration of Usage (Hours)", min_value=0.5, max_value=24.0, value=5.0, step=0.5)
 
     if st.button("🚀 Calculate Energy Consumption", use_container_width=True):
-        st.session_state.kitchen = kitchen
-        st.session_state.laundry = laundry
-        st.session_state.other = other
-        st.session_state.extra = extra
+        st.session_state.feature_values = feature_values
         st.session_state.duration = duration
 
-        # Total power and units
-        feature_energy = {
-            "Kitchen": kitchen * duration,
-            "Laundry": laundry * duration,
-            "Other Use": other * duration,
-            "Extra Loss": extra * duration
-        }
+        # Total units per feature
+        feature_energy = {feat.replace("_Power","").replace("_"," "): val*duration for feat,val in feature_values.items()}
         total_units = sum(feature_energy.values())
         total_cost = total_units * PRICE_PER_UNIT
 
-        # Identify features with high consumption (>30% of total)
+        # Advice based on features consuming >30%
         advice_list = []
         for feat, energy in feature_energy.items():
-            contribution = (energy / total_units) * 100
-            if contribution > 30:
-                if feat == "Kitchen":
-                    advice_list.append("⚠️ Kitchen consumes a lot! Cook efficiently, batch cooking, use lids.")
-                elif feat == "Laundry":
-                    advice_list.append("⚠️ Laundry consumes a lot! Wash full loads, avoid peak hours.")
-                elif feat == "Other Use":
-                    advice_list.append("⚠️ Other usage is high! Turn off devices when idle.")
-                elif feat == "Extra Loss":
-                    advice_list.append("⚠️ Extra losses are high! Check wiring and appliances.")
+            if (energy/total_units)*100 > 30:
+                advice_list.append(f"⚠️ {feat} consumes a lot! Consider efficient use.")
 
         if not advice_list:
-            advice_list.append("✅ Your energy usage is balanced across appliances.")
+            advice_list.append("✅ Your energy usage is balanced across features.")
 
         final_advice = "\n".join(advice_list)
         st.session_state.prediction = total_units
 
         # Display results
-        st.success("⚡ Electricity Usage Summary")
+        st.success(f"⚡ Electricity Usage Summary for {st.session_state.user_name}")
         st.markdown(
             f"""
 ### 🔌 Units & Duration
-- **Total Units Used:** `{total_units:.2f} units (kWh)`  
+- **Total Units Used:** `{total_units:.2f} units` (1 unit = 1 kWh)  
 - **Duration of Usage:** `{duration} hours`  
 
 ---
@@ -207,27 +187,17 @@ elif page == "Visualization":
     if st.session_state.prediction is None:
         st.warning("⚠️ Please calculate energy first from the Prediction page.")
     else:
-        plot_df = pd.DataFrame({
-            "Category": ["Kitchen", "Laundry", "Other Use", "Extra Loss"],
-            "Power (kW)": [
-                st.session_state.kitchen,
-                st.session_state.laundry,
-                st.session_state.other,
-                st.session_state.extra
-            ]
-        })
-
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.bar(plot_df["Category"], plot_df["Power (kW)"], color="#38bdf8")
-        ax.set_title("Household Power Distribution")
-        ax.set_ylabel("Power (kW)")
+        feature_values = st.session_state.feature_values
+        fig, ax = plt.subplots(figsize=(8,5))
+        ax.bar(feature_values.keys(), feature_values.values(), color="#38bdf8")
+        ax.set_title(f"{st.session_state.application_type} Power Distribution")
+        ax.set_ylabel("Power (kWh)")
         st.pyplot(fig)
 
-        # Show units, duration, and total cost
         total_cost = st.session_state.prediction * PRICE_PER_UNIT
         st.info(
             f"""
-🔋 **Total Units Used:** {st.session_state.prediction:.2f} units (kWh)  
+🔋 **Total Units Used:** {st.session_state.prediction:.2f} units (1 unit = 1 kWh)  
 ⏱️ **Duration:** {st.session_state.duration} hours  
 💰 **Total Cost:** {total_cost:,.0f} TZS
 """
