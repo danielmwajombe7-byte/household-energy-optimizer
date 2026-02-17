@@ -14,7 +14,7 @@ st.set_page_config(
 # ===============================
 # ELECTRICITY PRICE (TZS per kWh)
 # ===============================
-PRICE_PER_UNIT = 350  # Average Tanzania rate
+PRICE_PER_UNIT = 350  # 1 unit = 1 kWh
 
 # ===============================
 # LOAD DATA
@@ -129,7 +129,7 @@ elif page == "Prediction":
         "⏱️ Duration of Usage (Hours)",
         min_value=0.5,
         max_value=24.0,
-        value=12.5,
+        value=5.0,
         step=0.5
     )
 
@@ -142,10 +142,10 @@ elif page == "Prediction":
 
         # Calculate total power and energy
         total_power = kitchen + laundry + other + extra
-        energy_used = total_power * duration  # kWh
+        energy_used = total_power * duration  # kWh = total units
         total_cost = energy_used * PRICE_PER_UNIT  # TZS
 
-        # Advice logic
+        # Advice logic based on units used
         if energy_used <= 5:
             advice = "✅ Very efficient usage. Keep it up!"
         elif energy_used <= 15:
@@ -158,19 +158,18 @@ elif page == "Prediction":
         st.session_state.prediction = energy_used
 
         # Display nicely
-        st.success("⚡ Prediction Result")
+        st.success("⚡ Electricity Usage Summary")
         st.markdown(f"""
-### 🔌 Electricity Usage Summary
+### 🔌 Units & Duration
 
-- **Total Power Used:** `{total_power:.2f} kW`  
+- **Total Units Used:** `{energy_used:.2f} units (kWh)`  
 - **Duration of Usage:** `{duration} hours`  
-- **Total Energy Consumption:** `{energy_used:.2f} kWh`  
+- **1 Unit Price:** `{PRICE_PER_UNIT} TZS / unit`  
 
 ---
 
-### 💰 Cost Estimation
-- **Price per Unit:** `{PRICE_PER_UNIT} TZS / kWh`  
-- **Estimated Total Cost:** `{total_cost:,.0f} TZS`
+### 💰 Estimated Cost
+- **Total Cost:** `{total_cost:,.0f} TZS`
 
 ---
 
@@ -205,11 +204,11 @@ elif page == "Visualization":
         ax.set_ylabel("Power (kW)")
         st.pyplot(fig)
 
-        # Show estimated cost
+        # Show units, duration, and cost
         estimated_cost = st.session_state.prediction * PRICE_PER_UNIT
         st.info(
             f"""
-🔋 **Total Energy Used:** {st.session_state.prediction:.2f} kWh  
+🔋 **Total Units Used:** {st.session_state.prediction:.2f} units (kWh)  
 ⏱️ **Duration:** {st.session_state.duration} hours  
 💰 **Estimated Cost:** {estimated_cost:,.0f} TZS  
 """
