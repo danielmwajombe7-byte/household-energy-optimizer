@@ -54,78 +54,60 @@ model = train_model(df)
 # ===============================
 # SESSION STATE INIT
 # ===============================
-defaults = {
-    "prediction": None,
-    "duration": 1.0,
-    "kitchen": 0.0,
-    "laundry": 0.0,
-    "other": 0.0,
-    "extra": 0.0,
-    "user_name": "",
-    "application_type": "",
-    "show_dashboard": False,
-    "goto_prediction": False
-}
-
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-# ===============================
-# SIDEBAR
-# ===============================
-page = st.sidebar.radio(
-    "📌 Navigation",
-    ["Dashboard", "Prediction", "Visualization"]
-)
+if "user_name" not in st.session_state:
+    st.session_state.user_name = ""
+if "application_type" not in st.session_state:
+    st.session_state.application_type = "Select"
+if "prediction" not in st.session_state:
+    st.session_state.prediction = None
+if "duration" not in st.session_state:
+    st.session_state.duration = 1.0
+if "kitchen" not in st.session_state:
+    st.session_state.kitchen = 0.0
+if "laundry" not in st.session_state:
+    st.session_state.laundry = 0.0
+if "other" not in st.session_state:
+    st.session_state.other = 0.0
+if "extra" not in st.session_state:
+    st.session_state.extra = 0.0
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False  # controls login -> prediction
 
 # ===============================
-# DASHBOARD
+# LOGIN PAGE
 # ===============================
-if page == "Dashboard":
+if not st.session_state.authenticated:
     st.markdown("""
     <div style="background:linear-gradient(90deg,#0f2027,#203a43,#2c5364);
     padding:20px;border-radius:15px;color:white;text-align:center;">
         <div style="font-size:45px;">💡</div>
         <h1>Smart Energy Consumption Dashboard</h1>
-        <p>Predict • Measure • Understand Electricity Usage</p>
+        <p>Please login to access prediction</p>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # User login section
-    with st.form("user_pass_form"):
-        st.subheader("Enter Your Details to Access Prediction")
-        st.session_state.user_name = st.text_input("👤 Your Name")
-        st.session_state.application_type = st.selectbox(
-            "🏭 Application Type", ["Select", "Hospital", "Industry", "Other"]
-        )
+    with st.form("login_form"):
+        st.subheader("Enter Your Details")
+        user_name = st.text_input("👤 Your Name")
+        application_type = st.selectbox("🏭 Application Type", ["Select", "Hospital", "Industry", "Other"])
         submitted = st.form_submit_button("Continue")
 
         if submitted:
-            if st.session_state.user_name.strip() == "" or st.session_state.application_type == "Select":
+            if user_name.strip() == "" or application_type == "Select":
                 st.warning("⚠️ Verbal Warning. Please enter your Name and select Application Type.")
             else:
-                st.session_state.goto_prediction = True
-                st.success(f"Welcome {st.session_state.user_name}! Redirecting to Prediction form...")
-
-    # Dashboard summary toggle
-    st.markdown("<br>", unsafe_allow_html=True)
-    show = st.checkbox("Show Dashboard Summary Metrics")
-    if show:
-        col1, col2, col3 = st.columns(3)
-        col1.metric("📄 Records", df.shape[0])
-        col2.metric("📊 Features", len(FEATURES))
-        col3.metric("🎯 Target", "Energy (kWh)")
+                st.session_state.user_name = user_name
+                st.session_state.application_type = application_type
+                st.session_state.authenticated = True
+                st.experimental_rerun()  # immediately go to Prediction page
 
 # ===============================
-# PREDICTION PAGE
+# PREDICTION PAGE (MAIN)
 # ===============================
-if page == "Prediction" or st.session_state.goto_prediction:
+if st.session_state.authenticated:
     st.header("🧮 Predict Energy Usage")
-    st.write("Fill in appliance powers and duration below:")
-
+    st.write(f"User: **{st.session_state.user_name}** | Application: **{st.session_state.application_type}**")
+    
     col1, col2 = st.columns(2)
 
     with col1:
@@ -197,12 +179,9 @@ if page == "Prediction" or st.session_state.goto_prediction:
 # ===============================
 # VISUALIZATION PAGE
 # ===============================
-elif page == "Visualization":
-    st.header("📊 Energy Usage Visualization")
-
-    if st.session_state.prediction is None:
-        st.warning("⚠️ Please calculate energy first from the Prediction page.")
-    else:
+if st.session_state.authenticated:
+    st.subheader("📊 Energy Usage Visualization")
+    if st.session_state.prediction is not None:
         plot_df = pd.DataFrame({
             "Category": ["Kitchen", "Laundry", "Other Use", "Extra Loss"],
             "Power (kW)": [
