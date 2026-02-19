@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.tree import DecisionTreeRegressor
 import base64
-import os
 
 # ===============================
 # PAGE CONFIG
@@ -16,19 +15,19 @@ st.set_page_config(
 PRICE_PER_UNIT = 350  # TZS per kWh
 
 # ===============================
-# BACKGROUND FUNCTION (SAFE)
+# CLOUD-SAFE BACKGROUND FUNCTION
 # ===============================
-def add_bg_from_local(image_file):
-    if not os.path.isfile(image_file):
-        return  # Do nothing if image not found
-
-    with open(image_file, "rb") as img:
-        encoded = base64.b64encode(img.read()).decode()
-
+def add_bg_prediction():
+    # --- Base64 string of bg.jpg ---
+    encoded = """
+    iVBORw0KGgoAAAANSUhEUgAAAoAAAAHgCAYAAAA10dzkAAAABHNCSVQICAgIfAhkiAAAAAlwSFlz
+    AAALEgAACxIB0t1+/AAAABl0RVh0Q29tbWVudABDcmVhdGVkIHdpdGggR0lNUFeBDhcAAAIASURB
+    ... (paste your full Base64 string here) ...
+    """
     st.markdown(
         f"""
         <style>
-        .stApp {{
+        [data-testid="stAppViewContainer"] {{
             background-image: url("data:image/jpg;base64,{encoded}");
             background-size: cover;
             background-position: center;
@@ -178,7 +177,7 @@ else:
     st.session_state.page = "Login"
 
 # ===============================
-# LOGIN PAGE (NO BACKGROUND)
+# LOGIN PAGE
 # ===============================
 if st.session_state.page == "Login":
     st.markdown("""
@@ -202,12 +201,12 @@ if st.session_state.page == "Login":
             st.session_state.page = "Prediction"
 
 # ===============================
-# PREDICTION PAGE (WITH BACKGROUND)
+# PREDICTION PAGE
 # ===============================
 elif st.session_state.page == "Prediction":
 
-    # ✅ Background only here
-    add_bg_from_local("bg.jpg")
+    # ✅ Cloud-safe background only here
+    add_bg_prediction()
 
     st.markdown(f"""
     <div style="background:rgba(15,118,110,0.85);padding:20px;border-radius:14px;color:white;text-align:center;">
@@ -250,7 +249,7 @@ elif st.session_state.page == "Prediction":
 """)
 
 # ===============================
-# VISUALIZATION PAGE (NO BACKGROUND)
+# VISUALIZATION PAGE
 # ===============================
 elif st.session_state.page == "Visualization":
     if st.session_state.prediction is None:
