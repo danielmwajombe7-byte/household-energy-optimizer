@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.tree import DecisionTreeRegressor
 import base64
+import os
 
 # ===============================
 # PAGE CONFIG
@@ -12,12 +13,18 @@ st.set_page_config(
     layout="wide"
 )
 
+PRICE_PER_UNIT = 350  # TZS per kWh
+
 # ===============================
-# ADD BACKGROUND IMAGE
+# BACKGROUND FUNCTION (SAFE)
 # ===============================
 def add_bg_from_local(image_file):
+    if not os.path.isfile(image_file):
+        return  # Do nothing if image not found
+
     with open(image_file, "rb") as img:
         encoded = base64.b64encode(img.read()).decode()
+
     st.markdown(
         f"""
         <style>
@@ -32,11 +39,6 @@ def add_bg_from_local(image_file):
         """,
         unsafe_allow_html=True
     )
-
-# CHANGE IMAGE NAME IF NEEDED
-add_bg_from_local("bg.jpg")
-
-PRICE_PER_UNIT = 350  # TZS per kWh
 
 # ===============================
 # LOAD DATA
@@ -176,7 +178,7 @@ else:
     st.session_state.page = "Login"
 
 # ===============================
-# LOGIN PAGE
+# LOGIN PAGE (NO BACKGROUND)
 # ===============================
 if st.session_state.page == "Login":
     st.markdown("""
@@ -200,9 +202,13 @@ if st.session_state.page == "Login":
             st.session_state.page = "Prediction"
 
 # ===============================
-# PREDICTION PAGE
+# PREDICTION PAGE (WITH BACKGROUND)
 # ===============================
 elif st.session_state.page == "Prediction":
+
+    # ✅ Background only here
+    add_bg_from_local("bg.jpg")
+
     st.markdown(f"""
     <div style="background:rgba(15,118,110,0.85);padding:20px;border-radius:14px;color:white;text-align:center;">
         <h2>⚡ Energy Prediction</h2>
@@ -244,7 +250,7 @@ elif st.session_state.page == "Prediction":
 """)
 
 # ===============================
-# VISUALIZATION PAGE
+# VISUALIZATION PAGE (NO BACKGROUND)
 # ===============================
 elif st.session_state.page == "Visualization":
     if st.session_state.prediction is None:
