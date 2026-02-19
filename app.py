@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.tree import DecisionTreeRegressor
+import base64
 
 # ===============================
 # PAGE CONFIG
@@ -10,6 +11,30 @@ st.set_page_config(
     page_title="⚡ Smart Energy Consumption Dashboard",
     layout="wide"
 )
+
+# ===============================
+# ADD BACKGROUND IMAGE
+# ===============================
+def add_bg_from_local(image_file):
+    with open(image_file, "rb") as img:
+        encoded = base64.b64encode(img.read()).decode()
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("data:image/jpg;base64,{encoded}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# CHANGE IMAGE NAME IF NEEDED
+add_bg_from_local("bg.jpg")
 
 PRICE_PER_UNIT = 350  # TZS per kWh
 
@@ -61,8 +86,10 @@ model = train_model(df)
 # ===============================
 def generate_energy_advice(application, feature_usage):
     total = sum(feature_usage.values())
-    percentages = {k: (v / total) * 100 for k, v in feature_usage.items()}
+    if total == 0:
+        return "ℹ️ No energy usage detected."
 
+    percentages = {k: (v / total) * 100 for k, v in feature_usage.items()}
     max_feature = max(percentages, key=percentages.get)
     max_value = percentages[max_feature]
     high_features = [k for k, v in percentages.items() if v >= 25]
@@ -70,59 +97,51 @@ def generate_energy_advice(application, feature_usage):
     context = {
         "Home": {
             "balanced": "This shows responsible household energy behavior.",
-            "dominant": "Household appliances running for long hours often increase consumption.",
-            "suggestion": "Use energy-efficient appliances, switch off idle devices, and stagger usage."
+            "dominant": "Household appliances running for long hours increase consumption.",
+            "suggestion": "Use energy-efficient appliances and avoid idle usage."
         },
         "Hospital": {
-            "balanced": "This indicates efficient hospital energy management.",
+            "balanced": "Efficient hospital energy management is observed.",
             "dominant": "Critical medical equipment requires continuous power.",
-            "suggestion": "Optimize non-critical systems and maintain energy-efficient medical equipment."
+            "suggestion": "Optimize non-critical systems where possible."
         },
         "Mining": {
-            "balanced": "Energy usage is well distributed across mining operations.",
+            "balanced": "Mining energy usage is well distributed.",
             "dominant": "Heavy machinery consumes large continuous power.",
-            "suggestion": "Apply machinery scheduling, load balancing, and preventive maintenance."
+            "suggestion": "Apply machinery scheduling and preventive maintenance."
         },
         "School": {
-            "balanced": "This reflects effective energy use in learning facilities.",
-            "dominant": "Lighting and ICT labs significantly affect school energy usage.",
-            "suggestion": "Automate lighting, limit idle ICT use, and promote energy awareness."
+            "balanced": "Effective energy usage in learning facilities.",
+            "dominant": "Lighting and ICT labs significantly affect consumption.",
+            "suggestion": "Automate lighting and limit idle ICT usage."
         },
         "Industry": {
-            "balanced": "Energy demand is evenly managed across industrial systems.",
-            "dominant": "Industrial machines require high power during peak operation.",
-            "suggestion": "Schedule heavy machinery and invest in efficient industrial equipment."
+            "balanced": "Industrial energy demand is well managed.",
+            "dominant": "Industrial machines consume high power during operation.",
+            "suggestion": "Schedule heavy machinery during off-peak hours."
         }
     }
 
     ctx = context.get(application, context["Home"])
 
     if max_value < 40:
-        return (
-            "✅ WELL-BALANCED ENERGY USAGE\n\n"
-            f"{ctx['balanced']} Energy is evenly distributed, reducing system overload "
-            "and lowering operational costs.\n\n"
-            f"💡 Recommendation: {ctx['suggestion']}"
-        )
-
-    if max_value >= 45:
-        return (
-            f"⚠️ HIGH ENERGY CONSUMPTION: {max_feature}\n\n"
-            f"{ctx['dominant']} This increases total cost and energy strain.\n\n"
-            f"🔧 Action: Moderate usage, not elimination. {ctx['suggestion']}"
-        )
+        return f"✅ WELL-BALANCED USAGE\n\n{ctx['balanced']}\n\n💡 {ctx['suggestion']}"
 
     if len(high_features) >= 2:
         return (
-            "⚖️ MULTIPLE HIGH ENERGY CONSUMERS\n\n"
-            f"The following features consume high energy together: {', '.join(high_features)}.\n\n"
-            f"📊 Recommendation: Avoid simultaneous usage and apply moderation. {ctx['suggestion']}"
+            "⚖️ MULTIPLE HIGH ENERGY USERS\n\n"
+            f"{', '.join(high_features)} consume high energy together.\n\n"
+            f"📊 Recommendation: {ctx['suggestion']}"
         )
 
-    return "ℹ️ Energy analysis completed. Continue monitoring usage."
+    return (
+        f"⚠️ HIGH CONSUMPTION: {max_feature}\n\n"
+        f"{ctx['dominant']}\n\n"
+        f"🔧 Action: {ctx['suggestion']}"
+    )
 
 # ===============================
-# SESSION STATE INIT
+# SESSION STATE
 # ===============================
 defaults = {
     "logged_in": False,
@@ -140,18 +159,17 @@ for k, v in defaults.items():
         st.session_state[k] = v
 
 # ===============================
-# SIDEBAR NAVIGATION
+# SIDEBAR
 # ===============================
 if st.session_state.logged_in:
     st.sidebar.title("📌 Navigation")
     st.session_state.page = st.sidebar.radio(
         "Go to",
-        ["Prediction", "Visualization"],
-        index=0 if st.session_state.page == "Prediction" else 1
+        ["Prediction", "Visualization"]
     )
 
     st.sidebar.markdown("---")
-    if st.sidebar.button("🔄 Logout / Change Application"):
+    if st.sidebar.button("🔄 Logout"):
         for k, v in defaults.items():
             st.session_state[k] = v
 else:
@@ -162,12 +180,13 @@ else:
 # ===============================
 if st.session_state.page == "Login":
     st.markdown("""
-    <div style="background:#1e293b;padding:20px;border-radius:12px;color:white;text-align:center;">
-        <h1>⚡ Enter Your Details to Access Prediction</h1>
+    <div style="background:rgba(30,41,59,0.85);padding:25px;border-radius:14px;color:white;text-align:center;">
+        <h1>⚡ Smart Energy Consumption System</h1>
+        <p>Login to access predictions</p>
     </div>
     """, unsafe_allow_html=True)
 
-    st.session_state.username = st.text_input("👤 Your Name", st.session_state.username)
+    st.session_state.username = st.text_input("👤 Your Name")
     st.session_state.application = st.selectbox(
         "🏭 Select Application",
         ["Select"] + list(APPLICATION_FEATURES.keys())
@@ -175,7 +194,7 @@ if st.session_state.page == "Login":
 
     if st.button("➡️ Enter"):
         if st.session_state.username == "" or st.session_state.application == "Select":
-            st.warning("⚠️ Please enter name and select application.")
+            st.warning("⚠️ Fill all fields")
         else:
             st.session_state.logged_in = True
             st.session_state.page = "Prediction"
@@ -185,8 +204,8 @@ if st.session_state.page == "Login":
 # ===============================
 elif st.session_state.page == "Prediction":
     st.markdown(f"""
-    <div style="background:#0f766e;padding:15px;border-radius:12px;color:white;text-align:center;">
-        <h2>⚡ Energy Prediction Form</h2>
+    <div style="background:rgba(15,118,110,0.85);padding:20px;border-radius:14px;color:white;text-align:center;">
+        <h2>⚡ Energy Prediction</h2>
         <p>User: <b>{st.session_state.username}</b> | Application: <b>{st.session_state.application}</b></p>
     </div>
     """, unsafe_allow_html=True)
@@ -200,7 +219,7 @@ elif st.session_state.page == "Prediction":
 
     st.session_state.duration = st.slider("⏱️ Duration (Hours)", 0.5, 24.0, 5.0, 0.5)
 
-    if st.button("🚀 Predict Energy Used", use_container_width=True):
+    if st.button("🚀 Predict", use_container_width=True):
         total_units = sum(values.values()) * st.session_state.duration
         cost = total_units * PRICE_PER_UNIT
 
@@ -211,11 +230,11 @@ elif st.session_state.page == "Prediction":
             {k: v * st.session_state.duration for k, v in values.items()}
         )
 
-        st.success("⚡ Prediction Completed")
+        st.success("✅ Prediction completed")
 
         st.markdown(f"""
 ### 🔌 Results
-- **Total Energy Used:** `{total_units:.2f} kWh`
+- **Energy Used:** `{total_units:.2f} kWh`
 - **Estimated Cost:** `{cost:,.0f} TZS`
 
 ---
@@ -229,7 +248,7 @@ elif st.session_state.page == "Prediction":
 # ===============================
 elif st.session_state.page == "Visualization":
     if st.session_state.prediction is None:
-        st.warning("⚠️ Please make a prediction first.")
+        st.warning("⚠️ Predict first")
     else:
         st.subheader("📊 Energy Distribution")
 
@@ -245,7 +264,7 @@ elif st.session_state.page == "Visualization":
 
         st.pyplot(fig)
 
-        st.info(f"""
-🔋 Total Energy: {st.session_state.prediction:.2f} kWh  
-💰 Cost: {st.session_state.prediction * PRICE_PER_UNIT:,.0f} TZS
-""")
+        st.info(
+            f"🔋 Total Energy: {st.session_state.prediction:.2f} kWh\n"
+            f"💰 Cost: {st.session_state.prediction * PRICE_PER_UNIT:,.0f} TZS"
+        )
