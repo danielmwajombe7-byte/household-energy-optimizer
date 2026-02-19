@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.tree import DecisionTreeRegressor
-import base64
 
 # ===============================
 # PAGE CONFIG
@@ -13,30 +12,6 @@ st.set_page_config(
 )
 
 PRICE_PER_UNIT = 350  # TZS per kWh
-
-# ===============================
-# CLOUD-SAFE BACKGROUND (Prediction page only)
-# ===============================
-def add_bg_prediction():
-    try:
-        with open("energy.jpg", "rb") as img:
-            encoded = base64.b64encode(img.read()).decode()
-        st.markdown(
-            f"""
-            <style>
-            [data-testid="stAppViewContainer"] {{
-                background-image: url("data:image/jpg;base64,{encoded}");
-                background-size: cover;
-                background-position: center;
-                background-repeat: no-repeat;
-                background-attachment: fixed;
-            }}
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-    except FileNotFoundError:
-        st.warning("⚠️ Background image 'energy.jpg' not found. Place it in the project folder.")
 
 # ===============================
 # LOAD DATA
@@ -202,9 +177,6 @@ if st.session_state.page == "Login":
 # PREDICTION PAGE
 # ===============================
 elif st.session_state.page == "Prediction":
-
-    add_bg_prediction()  # background only here
-
     st.markdown(f"""
     <div style="background:rgba(15,118,110,0.85);padding:20px;border-radius:14px;color:white;text-align:center;">
         <h2>⚡ Energy Prediction</h2>
@@ -280,7 +252,7 @@ elif st.session_state.page == "Summary":
         <h2>📄 Feature Usage Summary</h2>
         <p>Typical Power Ratings (kW) for Various Applications</p>
     </div>
-    """ , unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     # Typical power table
     typical_power_data = [
